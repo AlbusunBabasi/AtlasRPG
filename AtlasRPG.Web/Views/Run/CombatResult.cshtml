@@ -1,457 +1,1235 @@
-﻿@using AtlasRPG.Application.Services
+@* AtlasRPG.Web/Views/Run/CombatResult.cshtml
+   Replaces the existing file at this path.
+*@
+@using AtlasRPG.Application.Services
+@using System.Text.Json
 @model AtlasRPG.Core.Entities.Combat.CombatResult
 @{
     ViewData["Title"] = Model.IsVictory ? "Victory!" : "Defeat";
     bool runIsActive = ViewBag.RunIsActive ?? false;
     Guid runId = ViewBag.RunId ?? Guid.Empty;
+    bool isPve = ViewBag.IsPveTurn ?? false;
+    var loot = ViewBag.Loot as LootDropResult;
+
+    var sortedRounds = Model.Rounds.OrderBy(r => r.RoundNumber).ToList();
+
+    // Estimate max HP: total damage received + last standing HP
+    decimal estPlayerMaxHp = Model.PlayerTotalDamageTaken + (sortedRounds.Any() ? Math.Max(0, sortedRounds.Last().PlayerHpRemaining) : 0);
+    decimal estOpponentMaxHp = Model.PlayerTotalDamageDealt + (sortedRounds.Any() ? Math.Max(0, sortedRounds.Last().OpponentHpRemaining) : 0);
+    if (estPlayerMaxHp <= 0) estPlayerMaxHp = 100;
+    if (estOpponentMaxHp <= 0) estOpponentMaxHp = 100;
+
+    // Serialize rounds for JS replay engine
+    var roundsJson = JsonSerializer.Serialize(sortedRounds.Select(r => new
+    {
+        r.RoundNumber,
+        r.PlayerAction,
+        r.PlayerHit,
+        r.PlayerCrit,
+        r.PlayerBlocked,
+        PlayerDamage = (double)r.PlayerDamage,
+        PlayerHpRemaining = (double)r.PlayerHpRemaining,
+        r.OpponentAction,
+        r.OpponentHit,
+        r.OpponentCrit,
+        r.OpponentBlocked,
+        OpponentDamage = (double)r.OpponentDamage,
+        OpponentHpRemaining = (double)r.OpponentHpRemaining,
+        r.EventLog
+    }));
+
+    int playerHits = sortedRounds.Count(r => r.PlayerHit);
+    int opponentHits = sortedRounds.Count(r => r.OpponentHit);
+    string playerAcc = sortedRounds.Any() ? ((double)playerHits / sortedRounds.Count * 100).ToString("F0") + "%" : "—";
+    string opponentAcc = sortedRounds.Any() ? ((double)opponentHits / sortedRounds.Count * 100).ToString("F0") + "%" : "—";
+    string playerBigHit = sortedRounds.Any() ? sortedRounds.Max(r => r.PlayerDamage).ToString("F0") : "—";
+    string opponentBigHit = sortedRounds.Any() ? sortedRounds.Max(r => r.OpponentDamage).ToString("F0") : "—";
 }
 
-<div class="container mt-4">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>@ViewData["Title"] — AtlasRPG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #09090f;
+            --surf: #0e0e1a;
+            --cp: #4a9eff;
+            --cp0: rgba(74,158,255,.16);
+            --ce: #ff4545;
+            --ce0: rgba(255,69,69,.14);
+            --gold: #f0c060;
+            --bl: #e05070;
+            --bu: #ff8830;
+            --po: #50e090;
+            --st: #ffe040;
+            --bf: #a070ff;
+            --ms: #555570;
+            --bk: #60d8ff;
+            --sd: #ff6020;
+            --fd: 'Cinzel',serif;
+            --fu: 'Rajdhani',sans-serif;
+        }
 
-    <!-- ── Result Header ─────────────────────────────────────── -->
-    <div class="card mb-4">
-        <div class="card-body text-center py-5">
-            @if (Model.IsVictory)
-            {
-                <h1 class="display-3 text-success mb-3">✅ VICTORY!</h1>
-                <p class="lead">You have defeated your opponent!</p>
-            }
-            else
-            {
-                <h1 class="display-3 text-danger mb-3">❌ DEFEAT</h1>
-                <p class="lead">You have fallen in battle...</p>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: #c8c8d8;
+            font-family: var(--fu);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ─── COUNTDOWN ─── */
+        #cdown {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center,#1a0a2e 0%,var(--bg) 72%);
+        }
+
+            #cdown::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,.01) 2px,rgba(255,255,255,.01) 4px);
+                pointer-events: none;
             }
 
-            <div class="mt-4">
-                @if (Model.WasSuddenDeath)
-                {
-                    <span class="badge bg-warning fs-5 me-2">
-                        ⚡ SUDDEN DEATH (@Model.SuddenDeathStacks stacks)
-                    </span>
+        #cnum {
+            font-family: var(--fd);
+            font-size: clamp(8rem,20vw,16rem);
+            font-weight: 900;
+            line-height: 1;
+            animation: cp .85s ease-out;
+        }
+
+            #cnum.n3 {
+                color: #558;
+                -webkit-text-stroke: 3px #778;
+                text-shadow: 0 0 80px rgba(80,80,130,.5);
+            }
+
+            #cnum.n2 {
+                color: #a04020;
+                -webkit-text-stroke: 3px #e06030;
+                text-shadow: 0 0 80px rgba(200,80,32,.5);
+            }
+
+            #cnum.n1 {
+                color: var(--ce);
+                -webkit-text-stroke: 3px #ff6060;
+                text-shadow: 0 0 80px rgba(255,60,60,.6);
+            }
+
+            #cnum.fi {
+                font-size: clamp(3.5rem,10vw,8rem);
+                color: var(--gold);
+                -webkit-text-stroke: 2px #ffd060;
+                text-shadow: 0 0 50px rgba(240,192,96,.9),0 0 120px rgba(240,192,96,.3);
+                animation: cf .7s ease-out forwards;
+            }
+
+        #csub {
+            font-size: .85rem;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            color: rgba(200,200,220,.28);
+            margin-top: .8rem;
+        }
+
+        @@keyframes cp {
+            0% {
+                transform: scale(1.55);
+                opacity: 0
+            }
+
+            45% {
+                transform: scale(.93);
+                opacity: 1
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1
+            }
+        }
+
+        @@keyframes cf {
+            0% {
+                transform: scale(.6);
+                opacity: 0
+            }
+
+            55% {
+                transform: scale(1.1);
+                opacity: 1
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1
+            }
+        }
+
+        /* ─── ARENA ─── */
+        #arena {
+            display: none;
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 1.4rem;
+        }
+
+        /* ─── FIGHTERS BAR ─── */
+        #fighters {
+            display: grid;
+            grid-template-columns: 1fr 44px 1fr;
+            gap: .7rem;
+            align-items: center;
+            margin-bottom: 1.1rem;
+        }
+
+        .fp {
+            background: rgba(255,255,255,.022);
+            border-radius: 11px;
+            padding: .9rem 1.1rem;
+            border: 1px solid rgba(255,255,255,.055);
+        }
+
+            .fp.pp {
+                border-color: rgba(74,158,255,.18);
+            }
+
+            .fp.ep {
+                border-color: rgba(255,69,69,.16);
+                text-align: right;
+            }
+
+        .fpn {
+            font-family: var(--fd);
+            font-size: .75rem;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            margin-bottom: .4rem;
+        }
+
+        .fp.pp .fpn {
+            color: var(--cp);
+        }
+
+        .fp.ep .fpn {
+            color: var(--ce);
+        }
+
+        .hbw {
+            height: 8px;
+            background: rgba(255,255,255,.065);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: .28rem;
+        }
+
+        .hbf {
+            height: 100%;
+            border-radius: 5px;
+            transition: width .5s cubic-bezier(.4,0,.2,1);
+        }
+
+        .fp.pp .hbf {
+            background: linear-gradient(90deg,#1e5ab0,var(--cp));
+            box-shadow: 0 0 10px rgba(74,158,255,.3);
+        }
+
+        .fp.ep .hbf {
+            background: linear-gradient(90deg,var(--ce),#ff8040);
+            box-shadow: 0 0 10px rgba(255,69,69,.28);
+        }
+
+        .hpt {
+            font-size: .72rem;
+            font-weight: 600;
+            color: rgba(185,185,210,.4);
+            letter-spacing: 1px;
+        }
+
+        .sr {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            min-height: 19px;
+            margin-top: .35rem;
+        }
+
+        .fp.ep .sr {
+            justify-content: flex-end;
+        }
+
+        .sc {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px;
+            border-radius: 20px;
+            font-size: .62rem;
+            font-weight: 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            opacity: 0;
+            transform: scale(.6);
+            transition: all .2s cubic-bezier(.4,0,.2,1);
+        }
+
+            .sc.on {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+        .sb {
+            background: rgba(224,80,112,.17);
+            border: 1px solid var(--bl);
+            color: var(--bl);
+        }
+
+        .su {
+            background: rgba(255,136,48,.17);
+            border: 1px solid var(--bu);
+            color: var(--bu);
+        }
+
+        .sp {
+            background: rgba(80,224,144,.17);
+            border: 1px solid var(--po);
+            color: var(--po);
+        }
+
+        .ss {
+            background: rgba(255,224,64,.17);
+            border: 1px solid var(--st);
+            color: var(--st);
+        }
+
+        .sf {
+            background: rgba(160,112,255,.17);
+            border: 1px solid var(--bf);
+            color: var(--bf);
+        }
+
+        .sm {
+            background: rgba(255,160,48,.17);
+            border: 1px solid #ffa030;
+            color: #ffa030;
+        }
+
+        .sa {
+            background: rgba(160,160,180,.17);
+            border: 1px solid #a0a0c0;
+            color: #a0a0c0;
+        }
+
+        .sh {
+            background: rgba(180,180,60,.17);
+            border: 1px solid #c8c030;
+            color: #c8c030;
+        }
+
+        .vs {
+            font-family: var(--fd);
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: rgba(255,255,255,.09);
+            text-align: center;
+        }
+
+        /* ─── ROUND LABEL ─── */
+        #rlw {
+            text-align: center;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: .6rem;
+        }
+
+        .rl {
+            font-family: var(--fd);
+            font-size: .8rem;
+            font-weight: 600;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(200,200,220,.22);
+            animation: fsd .28s ease-out;
+        }
+
+            .rl.sd {
+                color: var(--sd);
+                text-shadow: 0 0 18px rgba(255,96,32,.45);
+            }
+
+        @@keyframes fsd {
+            from {
+                opacity: 0;
+                transform: translateY(-5px)
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        /* ─── EVENT FEED ─── */
+        #feed {
+            display: flex;
+            flex-direction: column;
+            gap: .4rem;
+            min-height: 280px;
+            max-height: 390px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 0 .25rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,.06) transparent;
+        }
+
+            #feed::-webkit-scrollbar {
+                width: 3px;
+            }
+
+            #feed::-webkit-scrollbar-thumb {
+                background: rgba(255,255,255,.06);
+                border-radius: 2px;
+            }
+
+        .ec {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            padding: .55rem .85rem;
+            border-radius: 9px;
+            border: 1px solid transparent;
+            animation: es .3s cubic-bezier(.4,0,.2,1);
+        }
+
+            .ec.pe {
+                background: var(--cp0);
+                border-color: rgba(74,158,255,.12);
+            }
+
+            .ec.ee {
+                background: var(--ce0);
+                border-color: rgba(255,69,69,.1);
+                flex-direction: row-reverse;
+                text-align: right;
+            }
+
+            .ec.proc {
+                background: rgba(240,192,96,.04);
+                border-color: rgba(240,192,96,.09);
+                justify-content: center;
+                padding: .35rem .85rem;
+            }
+
+        @@keyframes es {
+            from {
+                opacity: 0;
+                transform: translateX(var(--sd2,-13px))
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        .ec.pe {
+            --sd2: -13px;
+        }
+
+        .ec.ee {
+            --sd2: 13px;
+        }
+
+        .ec.proc {
+            --sd2: 0;
+        }
+
+        .ei {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .9rem;
+            flex-shrink: 0;
+        }
+
+        .ec.pe .ei {
+            background: rgba(74,158,255,.13);
+        }
+
+        .ec.ee .ei {
+            background: rgba(255,69,69,.13);
+        }
+
+        .ea {
+            font-size: .8rem;
+            font-weight: 600;
+            color: rgba(218,218,238,.86);
+        }
+
+        .bdg {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+
+        .ec.ee .bdg {
+            justify-content: flex-end;
+        }
+
+        .b {
+            padding: 1px 6px;
+            border-radius: 20px;
+            font-size: .6rem;
+            font-weight: 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+        }
+
+        .bcr {
+            background: rgba(255,224,64,.17);
+            color: var(--st);
+            border: 1px solid rgba(255,224,64,.32);
+        }
+
+        .bbk {
+            background: rgba(96,216,255,.13);
+            color: var(--bk);
+            border: 1px solid rgba(96,216,255,.26);
+        }
+
+        .bms {
+            background: rgba(85,85,112,.18);
+            color: var(--ms);
+            border: 1px solid rgba(85,85,112,.28);
+        }
+
+        .bsk {
+            background: rgba(160,112,255,.13);
+            color: var(--bf);
+            border: 1px solid rgba(160,112,255,.26);
+        }
+
+        .edm {
+            font-family: var(--fd);
+            font-size: 1rem;
+            font-weight: 700;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .ec.pe .edm {
+            color: var(--cp);
+        }
+
+        .ec.ee .edm {
+            color: var(--ce);
+            margin-left: 0;
+            margin-right: auto;
+        }
+
+        .edm.cr {
+            color: var(--st) !important;
+            text-shadow: 0 0 10px rgba(255,224,64,.5);
+        }
+
+        .edm.ms {
+            color: var(--ms) !important;
+            font-size: .78rem;
+        }
+
+        .ptx {
+            font-size: .72rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* ─── RESULT PANEL ─── */
+        #rp {
+            display: none;
+            margin-top: 1.4rem;
+            border-radius: 13px;
+            overflow: hidden;
+            animation: rr .6s cubic-bezier(.4,0,.2,1);
+        }
+
+        @@keyframes rr {
+            from {
+                opacity: 0;
+                transform: translateY(26px) scale(.97)
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        .rh {
+            padding: 2.4rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .rh.v {
+                background: radial-gradient(ellipse at 50% 0%,rgba(74,158,255,.12) 0%,rgba(14,14,26,.9) 65%), linear-gradient(180deg,#0c1a2e,#09090f);
+                border: 1px solid rgba(74,158,255,.16);
+            }
+
+            .rh.d {
+                background: radial-gradient(ellipse at 50% 0%,rgba(255,69,69,.1) 0%,rgba(14,14,26,.9) 65%), linear-gradient(180deg,#1e0909,#09090f);
+                border: 1px solid rgba(255,69,69,.13);
+            }
+
+        .rt {
+            font-family: var(--fd);
+            font-size: clamp(2.4rem,6vw,3.8rem);
+            font-weight: 900;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            line-height: 1;
+            margin-bottom: .4rem;
+        }
+
+        .rh.v .rt {
+            color: var(--cp);
+            text-shadow: 0 0 40px rgba(74,158,255,.5),0 0 90px rgba(74,158,255,.18);
+        }
+
+        .rh.d .rt {
+            color: var(--ce);
+            text-shadow: 0 0 40px rgba(255,69,69,.4), 0 0 80px rgba(255,69,69,.14);
+        }
+
+        .rsub {
+            font-size: .82rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(165,165,190,.38);
+            margin-bottom: 1.4rem;
+        }
+
+        .rbs {
+            display: flex;
+            gap: .55rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 1.6rem;
+        }
+
+        .rb {
+            padding: .32rem .95rem;
+            border-radius: 20px;
+            font-size: .72rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .rbn {
+            background: rgba(255,255,255,.045);
+            border: 1px solid rgba(255,255,255,.09);
+            color: rgba(175,175,198,.55);
+        }
+
+        .rbs2 {
+            background: rgba(255,96,32,.13);
+            border: 1px solid rgba(255,96,32,.32);
+            color: var(--sd);
+        }
+
+        /* ─── STATS ─── */
+        .ss {
+            background: rgba(255,255,255,.017);
+            border-top: 1px solid rgba(255,255,255,.048);
+            padding: 1.3rem 1.8rem;
+        }
+
+        .sg {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .9rem;
+        }
+
+        .sc2 h6 {
+            font-family: var(--fd);
+            font-size: .62rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: .6rem;
+        }
+
+        .sc2.pc h6 {
+            color: rgba(74,158,255,.42);
+        }
+
+        .sc2.ec h6 {
+            color: rgba(255,69,69,.38);
+            text-align: right;
+        }
+
+        .sc2.ec {
+            text-align: right;
+        }
+
+        .sl {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: .28rem 0;
+            border-bottom: 1px solid rgba(255,255,255,.032);
+            font-size: .8rem;
+        }
+
+        .sc2.ec .sl {
+            flex-direction: row-reverse;
+        }
+
+        .sk {
+            color: rgba(148,148,172,.52);
+        }
+
+        .sv {
+            font-weight: 700;
+            color: rgba(218,218,238,.86);
+            font-size: .88rem;
+        }
+
+        /* ─── LOOT ─── */
+        .sl2 {
+            background: rgba(240,192,96,.022);
+            border-top: 1px solid rgba(240,192,96,.08);
+            padding: 1.2rem 1.8rem;
+        }
+
+        .lh2 {
+            font-family: var(--fd);
+            font-size: .62rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(240,192,96,.42);
+            margin-bottom: .8rem;
+        }
+
+        .li2 {
+            display: flex;
+            gap: .55rem;
+            flex-wrap: wrap;
+        }
+
+        .lit {
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(240,192,96,.17);
+            border-radius: 8px;
+            padding: .6rem .85rem;
+            font-size: .76rem;
+        }
+
+        .ln {
+            color: var(--gold);
+            font-weight: 700;
+            margin-bottom: .18rem;
+        }
+
+        .lt {
+            color: rgba(148,148,172,.48);
+            font-size: .66rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* ─── ACTION BAR ─── */
+        .ab {
+            border-top: 1px solid rgba(255,255,255,.048);
+            padding: 1rem 1.8rem;
+            display: flex;
+            gap: .55rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .ba {
+            display: inline-flex;
+            align-items: center;
+            gap: .42rem;
+            padding: .55rem 1.5rem;
+            border-radius: 7px;
+            font-family: var(--fu);
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-decoration: none;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all .16s;
+        }
+
+        .bap {
+            background: rgba(74,158,255,.13);
+            border-color: rgba(74,158,255,.32);
+            color: var(--cp);
+        }
+
+            .bap:hover {
+                background: rgba(74,158,255,.24);
+                border-color: var(--cp);
+                color: #fff;
+            }
+
+        .bag {
+            background: transparent;
+            border-color: rgba(255,255,255,.08);
+            color: rgba(165,165,190,.5);
+        }
+
+            .bag:hover {
+                border-color: rgba(255,255,255,.2);
+                color: rgba(218,218,238,.82);
+            }
+
+        /* ─── SD OVERLAY ─── */
+        #sdov {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sdf {
+            font-family: var(--fd);
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: 6px;
+            color: var(--sd);
+            text-shadow: 0 0 50px rgba(255,96,32,.9);
+            opacity: 0;
+            animation: sdfa 1.3s ease-out forwards;
+        }
+
+        @@keyframes sdfa {
+            0% {
+                opacity: 0;
+                transform: scale(.7)
+            }
+
+            25% {
+                opacity: 1;
+                transform: scale(1.06)
+            }
+
+            80% {
+                opacity: 1;
+                transform: scale(1)
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(1.04)
+            }
+        }
+
+        @@media(max-width:580px) {
+            #fighters {
+                grid-template-columns: 1fr;
+            }
+
+            .vs {
+                display: none;
+            }
+
+            .sg {
+                grid-template-columns: 1fr;
+            }
+
+            .ec.ee {
+                flex-direction: row;
+                text-align: left;
+            }
+
+                .ec.ee .bdg {
+                    justify-content: flex-start;
                 }
-                <span class="badge bg-secondary fs-5">@Model.TotalRounds Rounds</span>
-            </div>
-        </div>
+
+                .ec.ee .edm {
+                    margin-left: auto;
+                    margin-right: 0;
+                }
+
+            .sc2.ec, .sc2.ec h6, .sc2.ec .sl {
+                text-align: left;
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- COUNTDOWN -->
+    <div id="cdown">
+        <div id="cnum" class="n3">3</div>
+        <div id="csub">prepare for battle</div>
     </div>
 
-    <!-- ── Stats Comparison ──────────────────────────────────── -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-primary">
-                    <h5 class="mb-0">👤 Your Stats</h5>
+    <!-- ARENA -->
+    <div id="arena">
+
+        <div id="fighters">
+            <div class="fp pp">
+                <div class="fpn">⚔ You</div>
+                <div class="hbw"><div class="hbf" id="php" style="width:100%"></div></div>
+                <div class="hpt"><span id="pht">—</span></div>
+                <div class="sr" id="psr"></div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="fp ep">
+                <div class="fpn">@(Model.OpponentUsername ?? (isPve ? "🐉 Monster" : "🤖 Opponent")) ⚔</div>
+                <div class="hbw"><div class="hbf" id="ehp" style="width:100%"></div></div>
+                <div class="hpt"><span id="eht">—</span></div>
+                <div class="sr" id="esr"></div>
+            </div>
+        </div>
+
+        <div id="rlw"><span class="rl" id="rlbl">Round 1</span></div>
+        <div id="feed"></div>
+
+        <!-- RESULT -->
+        <div id="rp">
+            <div class="rh @(Model.IsVictory ? "v" : "d")">
+                <div class="rt">@(Model.IsVictory ? "Victory" : "Defeat")</div>
+                <div class="rsub">@(isPve ? "PvE Encounter" : "PvP Battle")</div>
+                <div class="rbs">
+                    <span class="rb rbn">@Model.TotalRounds rounds</span>
+                    @if (Model.WasSuddenDeath)
+                    {
+                        <span class="rb rbs2">⚡ Sudden Death ×@Model.SuddenDeathStacks</span>
+                    }
                 </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-4">
-                            <h3 class="text-danger">@Model.PlayerTotalDamageDealt.ToString("F0")</h3>
-                            <small>Damage Dealt</small>
-                        </div>
-                        <div class="col-4">
-                            <h3 class="text-warning">@Model.PlayerTotalDamageTaken.ToString("F0")</h3>
-                            <small>Damage Taken</small>
-                        </div>
-                        <div class="col-4">
-                            <h3 class="text-info">@Model.PlayerCriticalHits</h3>
-                            <small>Critical Hits</small>
-                        </div>
+            </div>
+
+            <div class="ss">
+                <div class="sg">
+                    <div class="sc2 pc">
+                        <h6>Your Stats</h6>
+                        <div class="sl"><span class="sk">Damage Dealt</span><span class="sv">@Model.PlayerTotalDamageDealt.ToString("F0")</span></div>
+                        <div class="sl"><span class="sk">Damage Taken</span><span class="sv">@Model.PlayerTotalDamageTaken.ToString("F0")</span></div>
+                        <div class="sl"><span class="sk">Critical Hits</span><span class="sv">@Model.PlayerCriticalHits</span></div>
+                        <div class="sl"><span class="sk">Accuracy</span><span class="sv">@playerAcc</span></div>
+                        <div class="sl"><span class="sk">Biggest Hit</span><span class="sv">@playerBigHit</span></div>
+                    </div>
+                    <div class="sc2 ec">
+                        <h6>@(Model.OpponentUsername ?? "Opponent")</h6>
+                        <div class="sl"><span class="sk">Damage Dealt</span><span class="sv">@Model.OpponentTotalDamageDealt.ToString("F0")</span></div>
+                        <div class="sl"><span class="sk">Damage Taken</span><span class="sv">@Model.OpponentTotalDamageTaken.ToString("F0")</span></div>
+                        <div class="sl"><span class="sk">Critical Hits</span><span class="sv">@Model.OpponentCriticalHits</span></div>
+                        <div class="sl"><span class="sk">Accuracy</span><span class="sv">@opponentAcc</span></div>
+                        <div class="sl"><span class="sk">Biggest Hit</span><span class="sv">@opponentBigHit</span></div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-danger">
-                    <h5 class="mb-0">🤖 @Model.OpponentUsername</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-4">
-                            <h3 class="text-danger">@Model.OpponentTotalDamageDealt.ToString("F0")</h3>
-                            <small>Damage Dealt</small>
-                        </div>
-                        <div class="col-4">
-                            <h3 class="text-warning">@Model.OpponentTotalDamageTaken.ToString("F0")</h3>
-                            <small>Damage Taken</small>
-                        </div>
-                        <div class="col-4">
-                            <h3 class="text-info">@Model.OpponentCriticalHits</h3>
-                            <small>Critical Hits</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── Combat Log ────────────────────────────────────────── -->
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">⚔️ Combat Log</h5>
-            <button class="btn btn-sm btn-outline-light"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#combatLog">
-                Toggle Log
-            </button>
-        </div>
-        <div class="collapse show" id="combatLog">
-            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                <table class="table table-sm table-dark table-striped mb-0">
-                    <thead class="sticky-top bg-dark">
-                        <tr>
-                            <th style="width:60px;">Round</th>
-                            <th>Your Action</th>
-                            <th style="width:80px;">Dmg</th>
-                            <th style="width:100px;">Opp. HP</th>
-                            <th>Opponent Action</th>
-                            <th style="width:80px;">Dmg</th>
-                            <th style="width:100px;">Your HP</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var round in Model.Rounds)
-                        {
-                            <tr>
-                                <td><strong>R@round.RoundNumber</strong></td>
-
-                                <!-- Player action -->
-                                <td>
-                                    @round.PlayerAction
-                                    @if (round.PlayerCrit)
-                                    {
-                                        <span class="badge bg-warning ms-1">CRIT</span>
-                                    }
-                                    @if (!round.PlayerHit)
-                                    {
-                                        <span class="badge bg-secondary ms-1">MISS</span>
-                                    }
-                                    @if (round.PlayerBlocked)
-                                    {
-                                        <span class="badge bg-info ms-1">BLOCK</span>
-                                    }
-                                </td>
-                                <td class="text-danger fw-bold">
-                                    @round.PlayerDamage.ToString("F0")
-                                </td>
-                                <td class="@(round.OpponentHpRemaining <= 0 ? "text-danger fw-bold" : "")">
-                                    @Math.Max(0, round.OpponentHpRemaining).ToString("F0")
-                                </td>
-
-                                <!-- Opponent action -->
-                                <td>
-                                    @round.OpponentAction
-                                    @if (round.OpponentCrit)
-                                    {
-                                        <span class="badge bg-warning ms-1">CRIT</span>
-                                    }
-                                    @if (!round.OpponentHit)
-                                    {
-                                        <span class="badge bg-secondary ms-1">MISS</span>
-                                    }
-                                    @if (round.OpponentBlocked)
-                                    {
-                                        <span class="badge bg-info ms-1">BLOCK</span>
-                                    }
-                                </td>
-                                <td class="text-danger fw-bold">
-                                    @round.OpponentDamage.ToString("F0")
-                                </td>
-                                <td class="@(round.PlayerHpRemaining <= 0 ? "text-danger fw-bold" : "")">
-                                    @Math.Max(0, round.PlayerHpRemaining).ToString("F0")
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @{
-        var loot = ViewBag.Loot as LootDropResult;
-        bool isPve = (bool)(ViewBag.IsPveTurn ?? false);
-    }
-
-    @if (isPve && loot != null)
-    {
-        <style>
-            .loot-section {
-                margin: 2rem 0;
-            }
-
-            .loot-header {
-                display: flex;
-                align-items: center;
-                gap: .75rem;
-                margin-bottom: 1rem;
-            }
-
-                .loot-header h5 {
-                    margin: 0;
-                    font-weight: 700;
-                }
-
-            .loot-count-badge {
-                background: #2a2a4a;
-                color: #9090c0;
-                font-size: .7rem;
-                font-weight: 700;
-                letter-spacing: 1px;
-                padding: .25rem .7rem;
-                border-radius: 999px;
-                border: 1px solid #3a3a6a;
-            }
-
-            .loot-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-                gap: 1rem;
-            }
-
-            .loot-card {
-                background: #12121f;
-                border-radius: 12px;
-                padding: 1.1rem 1.2rem;
-                border: 1px solid transparent;
-                transition: transform .15s, border-color .15s;
-                position: relative;
-                overflow: hidden;
-            }
-
-                .loot-card:hover {
-                    transform: translateY(-2px);
-                }
-
-                /* Rarity renk şeridi */
-                .loot-card::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    height: 3px;
-                }
-
-            .loot-normal {
-                border-color: #2a2a3a;
-            }
-
-                .loot-normal::before {
-                    background: #777;
-                }
-
-            .loot-magic {
-                border-color: #1a2a5a;
-            }
-
-                .loot-magic::before {
-                    background: linear-gradient(90deg,#4466cc,#6688ff);
-                }
-
-            .loot-rare {
-                border-color: #3a2800;
-            }
-
-                .loot-rare::before {
-                    background: linear-gradient(90deg,#cc8800,#ffcc44);
-                }
-
-            .loot-slot-badge {
-                font-size: .65rem;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 1.5px;
-                color: #5050a0;
-                margin-bottom: .35rem;
-            }
-
-            .loot-item-name {
-                font-weight: 700;
-                font-size: 1rem;
-                margin-bottom: .5rem;
-            }
-
-            .loot-ilvl {
-                font-size: .72rem;
-                color: #5050a0;
-                margin-bottom: .6rem;
-            }
-
-            .loot-affixes {
-                list-style: none;
-                padding: 0;
-                margin: 0;
-            }
-
-                .loot-affixes li {
-                    font-size: .8rem;
-                    color: #a0a0c0;
-                    padding: .15rem 0;
-                    border-bottom: 1px solid #1a1a2a;
-                }
-
-                    .loot-affixes li:last-child {
-                        border-bottom: none;
-                    }
-
-            .tier-badge {
-                display: inline-block;
-                font-size: .6rem;
-                font-weight: 700;
-                padding: .1rem .4rem;
-                border-radius: 4px;
-                margin-left: .3rem;
-            }
-
-            .t1 {
-                background: #1a2a1a;
-                color: #66bb6a;
-            }
-
-            .t2 {
-                background: #1a1a3a;
-                color: #64b5f6;
-            }
-
-            .t3 {
-                background: #2a1a2a;
-                color: #ce93d8;
-            }
-
-            .equip-btn {
-                margin-top: .75rem;
-                width: 100%;
-                background: #1a1a3a;
-                color: #8888cc;
-                border: 1px solid #2a2a5a;
-                border-radius: 8px;
-                padding: .45rem;
-                font-size: .8rem;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all .15s;
-                text-decoration: none;
-                display: block;
-                text-align: center;
-            }
-
-                .equip-btn:hover {
-                    background: #2a2a5a;
-                    border-color: #4444aa;
-                    color: #aaaaee;
-                }
-
-            .no-loot-msg {
-                text-align: center;
-                color: #5050a0;
-                padding: 2rem;
-                font-size: .9rem;
-            }
-        </style>
-
-        <div class="loot-section">
-            <div class="loot-header">
-                <h5>
-                    @if (loot.IsVictory)
-                    {
-                        <span>🎁 Loot Dropped</span>
-                    }
-                    else
-                    {
-                        <span>📦 Consolation Loot</span>
-                    }
-                </h5>
-                <span class="loot-count-badge">@loot.Items.Count item@(loot.Items.Count != 1 ? "s" : "")</span>
-                @if (!loot.IsVictory)
-                {
-                    <span style="font-size:.75rem;color:#5050a0;">
-                        (PVE loss — 1 drop)
-                    </span>
-                }
-            </div>
-
-            @if (loot.Items.Any())
+            @if (loot?.Items?.Count > 0)
             {
-                <div class="loot-grid">
-                    @foreach (var item in loot.Items)
-                    {
-                        string rarityClass = item.Rarity.ToLower() switch
+                <div class="sl2">
+                    <div class="lh2">🎁 Loot Dropped</div>
+                    <div class="li2">
+                        @foreach (var item in loot.Items)
                         {
-                            "magic" => "loot-magic",
-                            "rare" => "loot-rare",
-                            _ => "loot-normal",
-                        };
-                        string rarityLabel = item.Rarity switch
-                        {
-                            "Magic" => "🔵 Magic",
-                            "Rare" => "🟡 Rare",
-                            _ => "⚪ Normal",
-                        };
-
-                        <div class="loot-card @rarityClass">
-                            <div class="loot-slot-badge">
-                                @(item.Slot == "Weapon" && item.WeaponType != null
-                                    ? item.WeaponType
-                                    : item.Slot)
+                            <div class="lit">
+                                <div class="ln">@item.ItemName</div>
+                                <div class="lt">@item.Slot</div>
                             </div>
-                            <div class="loot-item-name">@rarityLabel @item.ItemName</div>
-                            <div class="loot-ilvl">ilvl @item.ItemLevel</div>
-
-                            @if (item.AffixSummaries.Any())
-                            {
-                                <ul class="loot-affixes">
-                                    @foreach (var aff in item.AffixSummaries)
-                                    {
-                                        <li>@Html.Raw(aff)</li>
-                                    }
-                                </ul>
-                            }
-
-                            @* Equip shortcut — inventory'deki RunItem ID ile *@
-                            <a href="/Run/Inventory/@(ViewBag.RunId)"
-                               class="equip-btn">
-                                📦 View in Inventory
-                            </a>
-                        </div>
-                    }
+                        }
+                    </div>
                 </div>
             }
-            else
-            {
-                <div class="no-loot-msg">No items generated — check LootService DI.</div>
-            }
-        </div>
-    }
-    else if (isPve)
-    {
-        @* PVE ama loot yoksa (TempData kaçtıysa) *@
-        <div class="alert alert-secondary mt-3">
-            🎒 Items added to inventory — check your bag in Turn Hub.
-        </div>
-    }
 
-    <!-- ── Continue Button ───────────────────────────────────── -->
-    <div class="text-center mb-5">
-        @if (runIsActive)
-        {
-            <!-- Run devam ediyor → TurnHub'a git -->
-            <form asp-action="ContinueRun" asp-controller="Run" method="post">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="runId" value="@runId" />
-                <button type="submit" class="btn btn-primary btn-lg px-5">
-                    ➡️ Continue to Next Turn
-                </button>
-            </form>
-        }
-        else
-        {
-            <!-- Run bitti (can 0 veya turn 20) → Summary'e git -->
-            <a asp-action="Summary" asp-controller="Run" asp-route-id="@runId"
-               class="btn btn-secondary btn-lg px-5">
-                🏁 View Run Summary
-            </a>
-        }
+            <div class="ab">
+                @if (runIsActive)
+                {
+                    <a href="/Run/TurnHub/@runId" class="ba bap">Continue Run →</a>
+                }
+                else
+                {
+                    <a href="/Run/Summary/@runId" class="ba bap">View Summary →</a>
+                }
+                <button class="ba bag" id="rbtn">↺ Replay</button>
+            </div>
+        </div>
+
     </div>
 
-</div>
+    <div id="sdov" style="display:none"></div>
+
+    <script>
+        // ── DATA
+        const ROUNDS = @Html.Raw(roundsJson);
+        const PMAX = @Html.Raw(((double)estPlayerMaxHp).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+        const EMAX = @Html.Raw(((double)estOpponentMaxHp).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+
+        // Known skill → status procs
+        const PROCS = {
+          QuickSlash:        [{ s:"Bleed",      d:2,  p:.20        }],
+          WeakPoint:         [{ s:"ArmorShred", d:2,  p:1.0        }],
+          CrossStrike:       [{ s:"Bleed",      d:2,  p:1.0        }],
+          Sunder:            [{ s:"Bleed",      d:3,  p:.40        }],
+          BleedingShot:      [{ s:"Bleed",      d:2,  p:1.0        }],
+          VenomousStrike:    [{ s:"Poison",     d:3,  p:1.0        }],
+          DimFlame:          [{ s:"Burn",       d:3,  p:.50        }],
+          FireBall:          [{ s:"Burn",       d:3,  p:.30        }],
+          Combustion:        [{ s:"Burn",       d:3,  p:1.0        }],
+          AshStrike:         [{ s:"AshCloud",   d:2,  p:1.0        }],
+          Paralyze:          [{ s:"Paralyze",   d:2,  p:1.0        }, { s:"Stun", d:1, p:.35 }],
+          SwordDance:        [{ s:"SwordDance", d:2,  p:1.0, b:1   }],
+          HuntersFocus:      [{ s:"HunterFocus",d:3,  p:1.0, b:1   }],
+          ColossusStance:    [{ s:"ColossusStance",d:3,p:1.0,b:1   }],
+          ShadowStep:        [{ s:"ShadowStep", d:1,  p:1.0, b:1   }],
+          StaticCharge:      [{ s:"StaticCharge",d:3, p:1.0, b:1   }],
+          AshArmor:          [{ s:"AshArmor",   d:3,  p:1.0, b:1   }],
+          ArmorPiercingArrow:[{ s:"Mark",       d:3,  p:1.0        }],
+        };
+
+        const ICO = {
+          Bleed:"🩸",Burn:"🔥",Poison:"☠️",Stun:"💫",ArmorShred:"🛡️",
+          AshCloud:"🌫️",Mark:"🎯",Paralyze:"⚡",SwordDance:"💃",
+          HunterFocus:"👁️",ColossusStance:"🗿",ShadowStep:"👤",
+          StaticCharge:"⚡",AshArmor:"🪨",
+        };
+
+        const SCLS = {
+          Bleed:"sb",Burn:"su",Poison:"sp",Stun:"ss",Paralyze:"ss",
+          Mark:"sm",ArmorShred:"sh",AshCloud:"sa",
+          SwordDance:"sf",HunterFocus:"sf",ColossusStance:"sf",
+          ShadowStep:"sf",StaticCharge:"sf",AshArmor:"sf",
+        };
+
+        const PCOL = {
+          Bleed:"var(--bl)",Burn:"var(--bu)",Poison:"var(--po)",
+          Stun:"var(--st)",Paralyze:"var(--st)",Mark:"#ffa030",
+          ArmorShred:"#c8c030",AshCloud:"#a0a0c0",
+        };
+
+        // ── STATE
+        let pSt = {}, eSt = {};
+
+        // ── UTILS
+        const slp = ms => new Promise(r => setTimeout(r,ms));
+
+        function aname(n){
+          if(n==="BasicAttack") return "Basic Attack";
+          return n.replace(/([A-Z])/g,' $1').trim();
+        }
+
+        function aicon(n){
+          const l=n.toLowerCase();
+          if(n==="BasicAttack") return "⚔️";
+          if(l.includes("stab")||l.includes("slash")) return "🗡️";
+          if(l.includes("fire")||l.includes("flame")||l.includes("burn")||l.includes("combustion")) return "🔥";
+          if(l.includes("arrow")||l.includes("shot")) return "🏹";
+          if(l.includes("shadow")||l.includes("step")) return "👤";
+          if(l.includes("stance")||l.includes("colossus")) return "🛡️";
+          if(l.includes("lightning")||l.includes("spark")||l.includes("chain")||l.includes("static")) return "⚡";
+          if(l.includes("poison")||l.includes("venom")) return "☠️";
+          if(l.includes("dance")) return "💃";
+          if(l.includes("focus")||l.includes("hunter")) return "🎯";
+          if(l.includes("ash")||l.includes("cloud")) return "🌫️";
+          if(l.includes("sunder")||l.includes("bleed")||l.includes("cross")) return "🩸";
+          if(l.includes("paralyze")||l.includes("stun")) return "⚡";
+          if(l.includes("weak")||l.includes("point")) return "🎯";
+          if(l.includes("armor")||l.includes("piercing")) return "🏹";
+          return "✨";
+        }
+
+        function updHP(who, hp, max){
+          document.getElementById(who+"p").style.width = Math.max(0,Math.min(100,hp/max*100))+"%";
+          document.getElementById(who+"t").textContent = `${Math.max(0,Math.ceil(hp))} HP`;
+        }
+
+        function updSt(who, map){
+          const row = document.getElementById(who+"sr");
+          row.innerHTML="";
+          for(const [s,d] of Object.entries(map)){
+            if(d.r<=0) continue;
+            const c=document.createElement("span");
+            c.className=`sc ${SCLS[s]||"sf"}`;
+            c.textContent=`${ICO[s]||"✦"} ${s}`;
+            if(d.stk>1) c.textContent+=` ×${d.stk}`;
+            row.appendChild(c);
+            requestAnimationFrame(()=>c.classList.add("on"));
+          }
+        }
+
+        function apSt(who, s, rounds){
+          const m = who==="p" ? pSt : eSt;
+          const ms = s==="Burn"?3:1;
+          if(m[s]){ m[s].r=rounds; if(m[s].stk<ms) m[s].stk++; }
+          else     { m[s]={r:rounds,stk:1,ms}; }
+          updSt(who, who==="p"?pSt:eSt);
+        }
+
+        function tickSt(who){
+          const m=who==="p"?pSt:eSt;
+          for(const k of Object.keys(m)){ m[k].r--; if(m[k].r<=0) delete m[k]; }
+          updSt(who,m);
+        }
+
+        const feed=document.getElementById("feed");
+        function addEv(html,cls){
+          const d=document.createElement("div");
+          d.className=`ec ${cls}`;
+          d.innerHTML=html;
+          feed.appendChild(d);
+          feed.scrollTop=feed.scrollHeight;
+        }
+
+        // ── REPLAY
+        async function replay(){
+          pSt={}; eSt={};
+          feed.innerHTML="";
+          updSt("p",{}); updSt("e",{});
+          updHP("ph",PMAX,PMAX); updHP("eh",EMAX,EMAX);
+
+          const TICK=620;
+          let sdShown=false;
+
+          for(let i=0;i<ROUNDS.length;i++){
+            const r=ROUNDS[i];
+
+            if(r.roundNumber>15 && !sdShown){
+              sdShown=true;
+              const ov=document.getElementById("sdov");
+              ov.style.display="flex";
+              ov.innerHTML='<div class="sdf">⚡ SUDDEN DEATH ⚡</div>';
+              await slp(1400); ov.style.display="none";
+            }
+
+            const lbl=document.getElementById("rlbl");
+            lbl.className=r.roundNumber>15?"rl sd":"rl";
+            lbl.textContent=""; void lbl.offsetWidth;
+            lbl.textContent=r.roundNumber>15?`⚡ Sudden Death — Round ${r.roundNumber}`:`Round ${r.roundNumber}`;
+
+            tickSt("p"); tickSt("e");
+            await slp(160);
+
+            // Player action
+            if(r.playerHit){
+              let b="";
+              if(r.playerCrit)    b+=`<span class="b bcr">Crit!</span>`;
+              if(r.playerBlocked) b+=`<span class="b bbk">Blocked</span>`;
+              if(r.playerAction!=="BasicAttack") b+=`<span class="b bsk">${aname(r.playerAction)}</span>`;
+              addEv(`<div class="ei">${aicon(r.playerAction)}</div>
+        <div style="flex:1"><div class="ea">${aname(r.playerAction)}</div><div class="bdg">${b}</div></div>
+        <div class="edm${r.playerCrit?" cr":""}">${Math.ceil(r.playerDamage)}</div>`,"pe");
+
+              const procs=PROCS[r.playerAction];
+              if(procs){
+                for(const proc of procs){
+                  await slp(190);
+                  if(proc.b){
+                    apSt("p",proc.s,proc.d||2);
+                    addEv(`<span class="ptx" style="color:var(--bf)">✨ ${ICO[proc.s]||""} ${proc.s} activated!</span>`,"proc");
+                  } else {
+                    apSt("e",proc.s,proc.d||2);
+                    const col=PCOL[proc.s]||"var(--gold)";
+                    addEv(`<span class="ptx" style="color:${col}">${ICO[proc.s]||"✦"} ${proc.s} applied!</span>`,"proc");
+                  }
+                }
+              }
+            } else {
+              addEv(`<div class="ei">${aicon(r.playerAction)}</div>
+        <div style="flex:1"><div class="ea">${aname(r.playerAction)}</div></div>
+        <div class="edm ms">MISS</div>`,"pe");
+            }
+
+            updHP("eh",r.opponentHpRemaining,EMAX);
+            await slp(TICK);
+            if(r.opponentHpRemaining<=0) break;
+
+            // Opponent action
+            if(r.opponentHit){
+              let ob="";
+              if(r.opponentCrit)    ob+=`<span class="b bcr">Crit!</span>`;
+              if(r.opponentBlocked) ob+=`<span class="b bbk">Blocked</span>`;
+              addEv(`<div class="ei">${aicon(r.opponentAction)}</div>
+        <div style="flex:1"><div class="ea">${aname(r.opponentAction)}</div><div class="bdg">${ob}</div></div>
+        <div class="edm${r.opponentCrit?" cr":""}">${Math.ceil(r.opponentDamage)}</div>`,"ee");
+            } else {
+              addEv(`<div class="ei">${aicon(r.opponentAction)}</div>
+        <div style="flex:1"><div class="ea">${aname(r.opponentAction)}</div></div>
+        <div class="edm ms">MISS</div>`,"ee");
+            }
+
+            updHP("ph",r.playerHpRemaining,PMAX);
+            await slp(TICK);
+            if(r.playerHpRemaining<=0) break;
+          }
+
+          if(ROUNDS.length){
+            const last=ROUNDS[ROUNDS.length-1];
+            updHP("ph",Math.max(0,last.playerHpRemaining),PMAX);
+            updHP("eh",Math.max(0,last.opponentHpRemaining),EMAX);
+          }
+
+          await slp(500);
+          const rp=document.getElementById("rp");
+          rp.style.display="block";
+          rp.scrollIntoView({behavior:"smooth",block:"start"});
+        }
+
+        // ── COUNTDOWN
+        async function countdown(){
+          const ov=document.getElementById("cdown");
+          const num=document.getElementById("cnum");
+          const sub=document.getElementById("csub");
+          for(const [txt,cls,ms] of [["3","n3",920],["2","n2",920],["1","n1",920],["FIGHT","fi",720]]){
+            num.className=cls; num.textContent=txt;
+            if(cls==="fi") sub.textContent="";
+            await slp(ms);
+          }
+          ov.style.transition="opacity .4s"; ov.style.opacity="0";
+          await slp(400); ov.style.display="none";
+          const ar=document.getElementById("arena");
+          ar.style.cssText="display:block;opacity:0;transition:opacity .3s;";
+          await slp(40); ar.style.opacity="1";
+          await slp(300); await replay();
+        }
+
+        document.getElementById("rbtn")?.addEventListener("click",async()=>{
+          document.getElementById("rp").style.display="none";
+          await slp(150); await replay();
+        });
+
+        window.addEventListener("load",countdown);
+    </script>
+</body>
+</html>
