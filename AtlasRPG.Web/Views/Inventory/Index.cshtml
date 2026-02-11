@@ -1,0 +1,454 @@
+﻿<!-- AtlasRPG.Web/Views/Inventory/Index.cshtml -->
+@using AtlasRPG.Core.Entities.Runs
+@using AtlasRPG.Core.Enums
+@{
+    ViewData["Title"] = "Inventory";
+    var run = ViewBag.Run as Run;
+}
+
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h4 class="mb-0">🎒 Inventory Management</h4>
+                </div>
+                <div class="col-md-6 text-end">
+                    <a asp-controller="Run" asp-action="TurnHub" asp-route-id="@run.Id" class="btn btn-outline-light">
+                        ← Back to Turn Hub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Equipment Slots (Left) -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">⚔️ Equipped Items</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Weapon Slot -->
+                    <div class="equipment-slot mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>🗡️ Weapon</strong>
+                            @if (run.Equipment?.Weapon != null)
+                            {
+                                <form asp-controller="Inventory" asp-action="Unequip" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="runId" value="@run.Id" />
+                                    <input type="hidden" name="runItemId" value="@run.Equipment.Weapon.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Unequip</button>
+                                </form>
+                            }
+                        </div>
+
+                        @if (run.Equipment?.Weapon != null)
+                        {
+                            var item = run.Equipment.Weapon.Item;
+                            <div class="equipped-item rarity-@item.Rarity.ToString().ToLower() p-2 rounded">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <strong>@item.WeaponType</strong>
+                                    <span class="badge bg-@(item.Rarity == ItemRarity.Normal ? "secondary" : item.Rarity == ItemRarity.Magic ? "primary" : "warning")">
+                                        @item.Rarity
+                                    </span>
+                                </div>
+                                <small class="text-muted">ilvl @item.ItemLevel</small>
+                                <div class="small mt-1">
+                                    <div>⚔️ Damage: @item.BaseDamage</div>
+                                    <div>⚡ Speed: @item.BaseAttackSpeed</div>
+                                    <div>💥 Crit: @((item.BaseCritChance * 100).ToString("F1"))%</div>
+                                </div>
+                                @if (item.Affixes.Any())
+                                {
+                                    <div class="affixes mt-2">
+                                        @foreach (var affix in item.Affixes)
+                                        {
+                                            <div class="small text-info">
+                                                + @affix.AffixDefinition.DisplayName:
+                                                @if (affix.AffixDefinition.IsPercentage)
+                                                {
+                                                    <text>@((affix.RolledValue * 100).ToString("F1"))%</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>@affix.RolledValue.ToString("F0")</text>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-3 border border-dashed rounded">
+                                Empty
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Offhand Slot -->
+                    <div class="equipment-slot mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>🔰 Offhand</strong>
+                            @if (run.Equipment?.Offhand != null)
+                            {
+                                <form asp-controller="Inventory" asp-action="Unequip" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="runId" value="@run.Id" />
+                                    <input type="hidden" name="runItemId" value="@run.Equipment.Offhand.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Unequip</button>
+                                </form>
+                            }
+                        </div>
+
+                        @if (run.Equipment?.Offhand != null)
+                        {
+                            var item = run.Equipment.Offhand.Item;
+                            <div class="equipped-item rarity-@item.Rarity.ToString().ToLower() p-2 rounded">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <strong>Offhand</strong>
+                                    <span class="badge bg-@(item.Rarity == ItemRarity.Normal ? "secondary" : item.Rarity == ItemRarity.Magic ? "primary" : "warning")">
+                                        @item.Rarity
+                                    </span>
+                                </div>
+                                <small class="text-muted">ilvl @item.ItemLevel</small>
+                                @if (item.Affixes.Any())
+                                {
+                                    <div class="affixes mt-2">
+                                        @foreach (var affix in item.Affixes)
+                                        {
+                                            <div class="small text-info">
+                                                + @affix.AffixDefinition.DisplayName:
+                                                @if (affix.AffixDefinition.IsPercentage)
+                                                {
+                                                    <text>@((affix.RolledValue * 100).ToString("F1"))%</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>@affix.RolledValue.ToString("F0")</text>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-3 border border-dashed rounded">
+                                Empty
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Armor Slot -->
+                    <div class="equipment-slot mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>🛡️ Armor</strong>
+                            @if (run.Equipment?.Armor != null)
+                            {
+                                <form asp-controller="Inventory" asp-action="Unequip" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="runId" value="@run.Id" />
+                                    <input type="hidden" name="runItemId" value="@run.Equipment.Armor.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Unequip</button>
+                                </form>
+                            }
+                        </div>
+
+                        @if (run.Equipment?.Armor != null)
+                        {
+                            var item = run.Equipment.Armor.Item;
+                            <div class="equipped-item rarity-@item.Rarity.ToString().ToLower() p-2 rounded">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <strong>Armor</strong>
+                                    <span class="badge bg-@(item.Rarity == ItemRarity.Normal ? "secondary" : item.Rarity == ItemRarity.Magic ? "primary" : "warning")">
+                                        @item.Rarity
+                                    </span>
+                                </div>
+                                <small class="text-muted">ilvl @item.ItemLevel</small>
+                                <div class="small mt-1">
+                                    <div>🛡️ Armor: @item.BaseArmor</div>
+                                    <div>💨 Evasion: @item.BaseEvasion</div>
+                                </div>
+                                @if (item.Affixes.Any())
+                                {
+                                    <div class="affixes mt-2">
+                                        @foreach (var affix in item.Affixes)
+                                        {
+                                            <div class="small text-info">
+                                                + @affix.AffixDefinition.DisplayName:
+                                                @if (affix.AffixDefinition.IsPercentage)
+                                                {
+                                                    <text>@((affix.RolledValue * 100).ToString("F1"))%</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>@affix.RolledValue.ToString("F0")</text>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-3 border border-dashed rounded">
+                                Empty
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Belt Slot -->
+                    <div class="equipment-slot mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>📿 Belt</strong>
+                            @if (run.Equipment?.Belt != null)
+                            {
+                                <form asp-controller="Inventory" asp-action="Unequip" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="runId" value="@run.Id" />
+                                    <input type="hidden" name="runItemId" value="@run.Equipment.Belt.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Unequip</button>
+                                </form>
+                            }
+                        </div>
+
+                        @if (run.Equipment?.Belt != null)
+                        {
+                            var item = run.Equipment.Belt.Item;
+                            <div class="equipped-item rarity-@item.Rarity.ToString().ToLower() p-2 rounded">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <strong>Belt</strong>
+                                    <span class="badge bg-@(item.Rarity == ItemRarity.Normal ? "secondary" : item.Rarity == ItemRarity.Magic ? "primary" : "warning")">
+                                        @item.Rarity
+                                    </span>
+                                </div>
+                                <small class="text-muted">ilvl @item.ItemLevel</small>
+                                @if (item.Affixes.Any())
+                                {
+                                    <div class="affixes mt-2">
+                                        @foreach (var affix in item.Affixes)
+                                        {
+                                            <div class="small text-info">
+                                                + @affix.AffixDefinition.DisplayName:
+                                                @if (affix.AffixDefinition.IsPercentage)
+                                                {
+                                                    <text>@((affix.RolledValue * 100).ToString("F1"))%</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>@affix.RolledValue.ToString("F0")</text>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-3 border border-dashed rounded">
+                                Empty
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Items (Right) -->
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📦 Inventory Items</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Filter by Slot -->
+                    <div class="btn-group mb-3" role="group">
+                        <button type="button" class="btn btn-sm btn-outline-light filter-btn active" data-filter="all">All</button>
+                        <button type="button" class="btn btn-sm btn-outline-light filter-btn" data-filter="Weapon">🗡️ Weapons</button>
+                        <button type="button" class="btn btn-sm btn-outline-light filter-btn" data-filter="Offhand">🔰 Offhand</button>
+                        <button type="button" class="btn btn-sm btn-outline-light filter-btn" data-filter="Armor">🛡️ Armor</button>
+                        <button type="button" class="btn btn-sm btn-outline-light filter-btn" data-filter="Belt">📿 Belts</button>
+                    </div>
+
+                    <div class="row" style="max-height: 700px; overflow-y: auto;">
+                        @foreach (var runItem in run.Inventory.Where(i => !i.IsEquipped).OrderBy(i => i.Item.Slot).ThenBy(i => i.Item.Rarity))
+                        {
+                            var item = runItem.Item;
+
+                            <div class="col-md-6 mb-3 inventory-item" data-slot="@item.Slot">
+                                <div class="card item-card h-100 rarity-@item.Rarity.ToString().ToLower()">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                <strong class="small">
+                                                    @if (item.Slot == ItemSlot.Weapon)
+                                                    {
+                                                        <text>🗡️ @item.WeaponType</text>
+                                                    }
+                                                    else if (item.Slot == ItemSlot.Armor)
+                                                    {
+                                                        <text>🛡️ Armor</text>
+                                                    }
+                                                    else if (item.Slot == ItemSlot.Belt)
+                                                    {
+                                                        <text>📿 Belt</text>
+                                                    }
+                                                    else
+                                                    {
+                                                        <text>🔰 Offhand</text>
+                                                    }
+                                                </strong>
+                                                <small class="text-muted ms-1">ilvl @item.ItemLevel</small>
+                                            </div>
+                                            <span class="badge bg-@(item.Rarity == ItemRarity.Normal ? "secondary" : item.Rarity == ItemRarity.Magic ? "primary" : "warning")">
+                                                @item.Rarity
+                                            </span>
+                                        </div>
+
+                                        @if (item.Slot == ItemSlot.Weapon)
+                                        {
+                                            <div class="small mb-2">
+                                                <div>⚔️ Damage: @item.BaseDamage</div>
+                                                <div>⚡ Speed: @item.BaseAttackSpeed</div>
+                                                <div>💥 Crit: @((item.BaseCritChance * 100).ToString("F1"))%</div>
+                                            </div>
+                                        }
+
+                                        @if (item.Affixes.Any())
+                                        {
+                                            <div class="affixes mb-2">
+                                                @foreach (var affix in item.Affixes)
+                                                {
+                                                    <div class="small text-info">
+                                                        + @affix.AffixDefinition.DisplayName:
+                                                        @if (affix.AffixDefinition.IsPercentage)
+                                                        {
+                                                            <text>@((affix.RolledValue * 100).ToString("F1"))%</text>
+                                                        }
+                                                        else
+                                                        {
+                                                            <text>@affix.RolledValue.ToString("F0")</text>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+
+                                        <form asp-controller="Inventory" asp-action="Equip" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="runId" value="@run.Id" />
+                                            <input type="hidden" name="runItemId" value="@runItem.Id" />
+                                            <button type="submit" class="btn btn-sm btn-success w-100">
+                                                ⚡ Equip
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        @if (!run.Inventory.Any(i => !i.IsEquipped))
+                        {
+                            <div class="col-12">
+                                <p class="text-muted text-center">All items are equipped</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .item-card {
+        border: 2px solid;
+        transition: all 0.3s;
+    }
+
+    .rarity-normal {
+        border-color: #888;
+        background: rgba(136, 136, 136, 0.05);
+    }
+
+    .rarity-magic {
+        border-color: #4169E1;
+        background: rgba(65, 105, 225, 0.05);
+    }
+
+    .rarity-rare {
+        border-color: #FFD700;
+        background: rgba(255, 215, 0, 0.05);
+    }
+
+    .item-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .equipment-slot {
+        background: rgba(30, 30, 50, 0.3);
+    }
+
+    .equipped-item {
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .affixes {
+        border-left: 2px solid #17a2b8;
+        padding-left: 8px;
+    }
+
+    .filter-btn.active {
+        background-color: #e94560;
+        border-color: #e94560;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        // Filter functionality
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Update active button
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                const filter = this.dataset.filter;
+
+                document.querySelectorAll('.inventory-item').forEach(item => {
+                    if (filter === 'all' || item.dataset.slot === filter) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+}

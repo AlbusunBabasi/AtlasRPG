@@ -1,0 +1,224 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Atlas RPG</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Font Awesome (eklendi) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+          integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/atlas-theme.css" asp-append-version="true" />
+
+    <!-- Page-specific styles -->
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <!-- Animated Background Particles -->
+    <div class="atlas-bg-particles" id="particles"></div>
+
+    <!-- Ambient Glow Effects -->
+    <div class="atlas-ambient-glow atlas-ambient-glow--1"></div>
+    <div class="atlas-ambient-glow atlas-ambient-glow--2"></div>
+    <div class="atlas-ambient-glow atlas-ambient-glow--3"></div>
+
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark atlas-navbar" id="mainNavbar">
+            <div class="container-fluid">
+                <a class="navbar-brand atlas-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <div class="atlas-brand__logo-wrapper">
+                        <div class="atlas-brand__icon">
+                            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M18 2L4 10V26L18 34L32 26V10L18 2Z" stroke="url(#brandGradBlue)" stroke-width="2" fill="none" />
+                                <path d="M18 8L10 13V23L18 28L26 23V13L18 8Z" fill="url(#brandGradBlue)" opacity="0.25" />
+                                <path d="M18 12L14 14.5V21.5L18 24L22 21.5V14.5L18 12Z" fill="url(#brandGradBlue)" />
+                                <defs>
+                                    <linearGradient id="brandGradBlue" x1="4" y1="2" x2="32" y2="34">
+                                        <stop offset="0%" stop-color="#00d2ff" />
+                                        <stop offset="50%" stop-color="#2d7ff9" />
+                                        <stop offset="100%" stop-color="#6366f1" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                        <div class="atlas-brand__text">
+                            <span class="atlas-brand__name">ATLAS</span>
+                            <span class="atlas-brand__suffix">RPG</span>
+                        </div>
+                    </div>
+                </a>
+
+                <button class="navbar-toggler atlas-toggler" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navbarContent"
+                        aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <div class="atlas-hamburger">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </button>
+
+                <div class="collapse navbar-collapse" id="navbarContent">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link atlas-nav-link @(ViewData["Title"]?.ToString() == "Home" ? "active" : "")"
+                               asp-controller="Home" asp-action="Index">
+                                <i class="bi bi-house-door"></i>
+                                <span>Home</span>
+                            </a>
+                        </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link atlas-nav-link @(ViewData["Title"]?.ToString() == "Dashboard" ? "active" : "")"
+                                   asp-controller="Game" asp-action="Dashboard">
+                                    <i class="bi bi-controller"></i>
+                                    <span>Dashboard</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link atlas-nav-link @(ViewData["Title"]?.ToString() == "Leaderboard" ? "active" : "")"
+                                   asp-controller="Game" asp-action="Leaderboard">
+                                    <i class="bi bi-trophy"></i>
+                                    <span>Leaderboard</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link atlas-nav-link @(ViewData["Title"]?.ToString() == "Create Your Champion" ? "active" : "")"
+                                   asp-controller="Run" asp-action="Create">
+                                    <i class="bi bi-lightning-charge"></i>
+                                    <span>New Run</span>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+
+                    <ul class="navbar-nav ms-auto">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link atlas-nav-link atlas-user-menu dropdown-toggle"
+                                   href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <div class="atlas-avatar">
+                                        <span>@User.Identity.Name?.Substring(0, 1).ToUpper()</span>
+                                    </div>
+                                    <span class="atlas-username">@User.Identity.Name</span>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end atlas-dropdown">
+                                    <li>
+                                        <a class="dropdown-item atlas-dropdown-item" asp-controller="Game" asp-action="Dashboard">
+                                            <i class="bi bi-person"></i> Profile
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item atlas-dropdown-item" href="#">
+                                            <i class="bi bi-gear"></i> Settings
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider atlas-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item atlas-dropdown-item atlas-dropdown-item--danger"
+                                           asp-controller="Account" asp-action="Logout">
+                                            <i class="bi bi-box-arrow-right"></i> Logout
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link atlas-nav-link" asp-controller="Account" asp-action="Login">
+                                    <i class="bi bi-box-arrow-in-right"></i>
+                                    <span>Login</span>
+                                </a>
+                            </li>
+                            <li class="nav-item ms-2">
+                                <a class="btn atlas-btn atlas-btn--primary atlas-btn--sm"
+                                   asp-controller="Account" asp-action="Register">
+                                    <i class="bi bi-person-plus"></i> Register
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container atlas-container">
+        @if (TempData["Success"] != null)
+        {
+            <div class="atlas-toast atlas-toast--success" role="alert">
+                <i class="bi bi-check-circle"></i>
+                <span>@TempData["Success"]</span>
+                <button type="button" class="atlas-toast__close" onclick="this.parentElement.remove()">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="atlas-toast atlas-toast--error" role="alert">
+                <i class="bi bi-exclamation-triangle"></i>
+                <span>@TempData["Error"]</span>
+                <button type="button" class="atlas-toast__close" onclick="this.parentElement.remove()">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        }
+
+        <main role="main" class="pb-5">
+            @RenderBody()
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="atlas-footer">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <div class="atlas-footer__brand">
+                        <span class="atlas-brand__name" style="font-size: 1.2rem;">ATLAS</span>
+                        <span class="atlas-brand__suffix" style="font-size: 1.2rem;">RPG</span>
+                    </div>
+                    <p class="atlas-footer__tagline">Forge Your Legend</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div class="atlas-footer__links">
+                        <a href="#">Privacy</a>
+                        <span class="atlas-footer__separator">•</span>
+                        <a href="#">Terms</a>
+                        <span class="atlas-footer__separator">•</span>
+                        <a href="#">Support</a>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <p class="atlas-footer__copyright">&copy; 2024 Atlas RPG. All rights reserved.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/atlas-theme.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

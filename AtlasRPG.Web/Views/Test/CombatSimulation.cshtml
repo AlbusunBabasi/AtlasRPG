@@ -1,0 +1,107 @@
+﻿<!-- AtlasRPG.Web/Views/Test/CombatSimulation.cshtml -->
+@{
+    ViewData["Title"] = "Combat Test";
+    var result = ViewBag.Result as AtlasRPG.Core.Entities.Combat.CombatResult;
+}
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h3>⚔️ Combat Simulation Test</h3>
+        </div>
+        <div class="card-body">
+            @if (result != null)
+            {
+                <div class="alert @(result.IsVictory ? "alert-success" : "alert-danger")">
+                    <h4>@(result.IsVictory ? "✅ Victory!" : "❌ Defeat!")</h4>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Player Stats</h5>
+                                <ul>
+                                    <li>Total Damage Dealt: @result.PlayerTotalDamageDealt.ToString("F1")</li>
+                                    <li>Total Damage Taken: @result.PlayerTotalDamageTaken.ToString("F1")</li>
+                                    <li>Critical Hits: @result.PlayerCriticalHits</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Opponent Stats</h5>
+                                <ul>
+                                    <li>Total Damage Dealt: @result.OpponentTotalDamageDealt.ToString("F1")</li>
+                                    <li>Total Damage Taken: @result.OpponentTotalDamageTaken.ToString("F1")</li>
+                                    <li>Critical Hits: @result.OpponentCriticalHits</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h5>Combat Log (@result.TotalRounds rounds @(result.WasSuddenDeath ? "- SUDDEN DEATH!" : ""))</h5>
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-sm table-dark table-striped">
+                        <thead class="sticky-top bg-dark">
+                            <tr>
+                                <th>Round</th>
+                                <th>Player Action</th>
+                                <th>Damage</th>
+                                <th>Opponent HP</th>
+                                <th>Opponent Action</th>
+                                <th>Damage</th>
+                                <th>Player HP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var round in result.Rounds)
+                            {
+                                <tr>
+                                    <td><strong>R@round.RoundNumber</strong></td>
+                                    <td>
+                                        @round.PlayerAction
+                                        @if (round.PlayerCrit)
+                                        {
+                                            <span class="badge bg-warning">CRIT</span>
+                                        }
+                                        @if (!round.PlayerHit)
+                                        {
+                                            <span class="badge bg-secondary">MISS</span>
+                                        }
+                                    </td>
+                                    <td class="text-danger">@round.PlayerDamage.ToString("F1")</td>
+                                    <td>@round.OpponentHpRemaining.ToString("F1")</td>
+                                    <td>
+                                        @round.OpponentAction
+                                        @if (round.OpponentCrit)
+                                        {
+                                            <span class="badge bg-warning">CRIT</span>
+                                        }
+                                        @if (!round.OpponentHit)
+                                        {
+                                            <span class="badge bg-secondary">MISS</span>
+                                        }
+                                    </td>
+                                    <td class="text-danger">@round.OpponentDamage.ToString("F1")</td>
+                                    <td>@round.PlayerHpRemaining.ToString("F1")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <a asp-action="CombatSimulation" class="btn btn-primary">🔄 Run Another Test</a>
+                </div>
+            }
+            else
+            {
+                <p>No combat result available.</p>
+            }
+        </div>
+    </div>
+</div>

@@ -1,0 +1,366 @@
+﻿<!-- AtlasRPG.Web/Views/Run/TurnHub.cshtml -->
+@model AtlasRPG.Web.Models.RunViews.TurnHubViewModel
+@{
+    ViewData["Title"] = $"Turn {Model.CurrentTurn.TurnNumber} - {Model.Run.Race} {Model.Run.Class}";
+}
+
+<div class="container-fluid mt-4">
+    <!-- Top Progress Bar -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <strong>Turn @Model.CurrentTurn.TurnNumber / 20</strong>
+                    @if (Model.CurrentTurn.IsPvp)
+                    {
+                        <span class="badge bg-danger ms-2">⚔️ PVP</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success ms-2">🗡️ PVE</span>
+                    }
+                </div>
+                <div class="text-center mb-3">
+                    <a asp-controller="Shop" asp-action="Index" asp-route-runId="@Model.Run.Id" class="btn btn-warning btn-lg">
+                        🛒 Open Shop
+                    </a>
+                    <a asp-controller="Inventory" asp-action="Index" asp-route-runId="@Model.Run.Id" class="btn btn-info btn-lg">
+                        🎒 Manage Inventory
+                    </a>
+                    <a asp-controller="Run" asp-action="PassiveTree" asp-route-runId="@Model.Run.Id" class="btn btn-info btn-lg">
+                        Tree
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <div class="progress">
+                        <div class="progress-bar bg-warning" style="width: @((Model.CurrentTurn.TurnNumber / 20.0 * 100))%"></div>
+                    </div>
+                </div>
+                <div class="col-md-3 text-end">
+                    <span class="me-3">💰 @Model.Run.Gold Gold</span>
+                    <span class="me-3">❤️ @Model.Run.RemainingLives Lives</span>
+                    <span>⭐ Lvl @Model.Run.CurrentLevel</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Panel: Character Stats -->
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Character</h5>
+                </div>
+                <div class="card-body">
+                    <h6>@Model.Run.Race @Model.Run.Class</h6>
+
+                    <hr />
+
+                    <div class="mb-2">
+                        <small class="text-muted">HP / Mana</small>
+                        <div>❤️ @Model.MaxHp</div>
+                        <div>💧 @Model.MaxMana</div>
+                    </div>
+
+                    <hr />
+
+                    <div class="mb-2">
+                        <small class="text-muted">Stats</small>
+                        <div class="row g-1">
+                            <div class="col-6">STR: @Model.Run.Strength</div>
+                            <div class="col-6">DEX: @Model.Run.Dexterity</div>
+                            <div class="col-6">AGI: @Model.Run.Agility</div>
+                            <div class="col-6">INT: @Model.Run.Intelligence</div>
+                            <div class="col-6">VIT: @Model.Run.Vitality</div>
+                            <div class="col-6">WIS: @Model.Run.Wisdom</div>
+                            <div class="col-6">LUK: @Model.Run.Luck</div>
+                        </div>
+                    </div>
+
+                    @if (Model.Run.AvailableStatPoints > 0)
+                    {
+                        <div class="alert alert-info py-1 px-2 mt-2">
+                            <small>💎 @Model.Run.AvailableStatPoints stat points available!</small>
+                        </div>
+                    }
+
+                    @if (Model.Run.HasWoundDebuff)
+                    {
+                        <div class="alert alert-danger py-1 px-2 mt-2">
+                            <small>🩸 Wound: -3% all stats</small>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Combat Stats Preview -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Combat Stats</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <div>⚔️ Damage: @Model.Damage.ToString("F1")</div>
+                        <div>🛡️ Armor: @Model.Armor.ToString("F1")</div>
+                        <div>💥 Crit: @((Model.CritChance * 100).ToString("F1"))%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel: Equipment -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Equipment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <!-- Weapon Slot -->
+                        <div class="col-6 mb-3">
+                            <div class="equipment-slot">
+                                <h6>🗡️ Weapon</h6>
+                                @if (Model.Equipment?.Weapon?.Item != null)
+                                {
+                                    var item = Model.Equipment.Weapon.Item;
+                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
+                                        <strong>@item.WeaponType</strong>
+                                        <div class="small">ilvl @item.ItemLevel</div>
+                                        <div class="small text-muted">
+                                            @foreach (var affix in item.Affixes)
+                                            {
+                                                <div>@affix.AffixDefinition.DisplayName: @affix.RolledValue.ToString("F1")</div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="empty-slot">Empty</div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Armor Slot -->
+                        <div class="col-6 mb-3">
+                            <div class="equipment-slot">
+                                <h6>🛡️ Armor</h6>
+                                @if (Model.Equipment?.Armor?.Item != null)
+                                {
+                                    var item = Model.Equipment.Armor.Item;
+                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
+                                        <strong>Armor</strong>
+                                        <div class="small">ilvl @item.ItemLevel</div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="empty-slot">Empty</div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Belt Slot -->
+                        <div class="col-6 mb-3">
+                            <div class="equipment-slot">
+                                <h6>📿 Belt</h6>
+                                @if (Model.Equipment?.Belt?.Item != null)
+                                {
+                                    var item = Model.Equipment.Belt.Item;
+                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
+                                        <strong>Belt</strong>
+                                        <div class="small">ilvl @item.ItemLevel</div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="empty-slot">Empty</div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Offhand Slot -->
+                        <div class="col-6 mb-3">
+                            <div class="equipment-slot">
+                                <h6>🔰 Offhand</h6>
+                                @if (Model.Equipment?.Offhand?.Item != null)
+                                {
+                                    var item = Model.Equipment.Offhand.Item;
+                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
+                                        <strong>Offhand</strong>
+                                        <div class="small">ilvl @item.ItemLevel</div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="empty-slot">Empty</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start Combat Button -->
+            <div class="text-center">
+                <form asp-action="StartCombat" asp-route-turnId="@Model.CurrentTurn.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary btn-lg px-5">
+                        ⚔️ Start @(Model.CurrentTurn.IsPvp ? "PVP" : "PVE") Battle
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Panel: Skills -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Active Skills</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.AvailableSkills.Any())
+                    {
+                        <form asp-action="StartCombat" method="post" id="combatForm">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="TurnId" value="@Model.CurrentTurn.Id" />
+
+                            <p class="small text-muted mb-3">Select 1 skill for this turn:</p>
+
+                            @foreach (var skill in Model.AvailableSkills)
+                            {
+                                <label class="skill-card mb-2 p-2 d-block" style="cursor: pointer;">
+                                    <input type="radio"
+                                           name="SelectedSkillId"
+                                           value="@skill.Id"
+                                           class="skill-radio d-none"
+                                           required />
+                                    <div class="skill-content">
+                                        <strong>@skill.DisplayName</strong>
+                                        <div class="small mt-1">
+                                            <span class="badge bg-info">@skill.Multiplier.ToString("F2")x</span>
+                                            <span class="badge bg-primary">@skill.ManaCost mana</span>
+                                            <span class="badge bg-secondary">CD: @skill.Cooldown</span>
+                                        </div>
+                                        <div class="small text-muted mt-1">@skill.Description</div>
+                                    </div>
+                                </label>
+                            }
+
+                            <button type="submit" class="btn btn-primary w-100 mt-3" id="startBattleBtn">
+                                ⚔️ Start @(Model.CurrentTurn.IsPvp ? "PVP" : "PVE") Battle
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No weapon equipped</p>
+                    }
+                </div>
+            </div>
+
+            @if (Model.Run.AvailableStatPoints > 0 || Model.Run.AvailableSkillPoints > 0)
+            {
+                <div class="card mt-3">
+                    <div class="card-body text-center">
+                        @if (Model.Run.AvailableStatPoints > 0)
+                        {
+                            <a asp-action="AllocateStats" asp-route-id="@Model.Run.Id" class="btn btn-warning btn-sm w-100 mb-2">
+                                💎 Allocate @Model.Run.AvailableStatPoints Stat Points
+                            </a>
+                        }
+                        @if (Model.Run.AvailableSkillPoints > 0)
+                        {
+                            <a asp-action="PassiveTree" asp-route-id="@Model.Run.Id" class="btn btn-info btn-sm w-100">
+                                🌳 Spend @Model.Run.AvailableSkillPoints Passive Points
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .equipment-slot {
+        padding: 10px;
+        border: 1px dashed #555;
+        border-radius: 5px;
+        min-height: 150px;
+    }
+
+    .empty-slot {
+        padding: 20px;
+        color: #666;
+        font-style: italic;
+    }
+
+    .item-card {
+        padding: 10px;
+        border-radius: 5px;
+        border: 2px solid;
+    }
+
+    .rarity-normal {
+        border-color: #888;
+        background: rgba(136, 136, 136, 0.1);
+    }
+
+    .rarity-magic {
+        border-color: #4169E1;
+        background: rgba(65, 105, 225, 0.1);
+    }
+
+    .rarity-rare {
+        border-color: #FFD700;
+        background: rgba(255, 215, 0, 0.1);
+    }
+
+    .skill-card {
+        border: 1px solid #444;
+        border-radius: 5px;
+        background: rgba(30, 30, 50, 0.5);
+    }
+
+    .skill-card {
+        border: 2px solid #444;
+        border-radius: 5px;
+        background: rgba(30, 30, 50, 0.5);
+        transition: all 0.3s;
+    }
+
+        .skill-card:hover {
+            border-color: #e94560;
+            background: rgba(233, 69, 96, 0.1);
+        }
+
+    .skill-radio:checked + .skill-content {
+        /* Visual feedback */
+    }
+
+    .skill-radio:checked ~ .skill-content,
+    input[type="radio"]:checked + .skill-content {
+        background: rgba(233, 69, 96, 0.2);
+    }
+
+    /* Fix for radio selection visual */
+    .skill-card:has(.skill-radio:checked) {
+        border-color: #e94560;
+        background: rgba(233, 69, 96, 0.15);
+    }
+</style>
+<script>
+    // Skill selection feedback
+    document.querySelectorAll('.skill-radio').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('.skill-card').forEach(card => {
+                card.style.borderColor = '#444';
+            });
+            if (this.checked) {
+                this.closest('.skill-card').style.borderColor = '#e94560';
+            }
+        });
+    });
+</script>

@@ -1,0 +1,366 @@
+﻿@model AtlasRPG.Web.Models.RunViews.CreateRunViewModel
+@{
+    ViewData["Title"] = "Create Your Champion";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-11 col-xl-10">
+
+        <!-- Page Header -->
+        <div class="atlas-create-hero atlas-fade-in">
+            <div class="atlas-create-hero__icon">
+                <i class="fas fa-khanda"></i>
+                <div class="atlas-create-hero__icon-ring"></div>
+            </div>
+            <h1 class="atlas-display-2 atlas-text-gradient atlas-create-hero__title">
+                Forge Your Champion
+            </h1>
+            <p class="atlas-subheading atlas-create-hero__subtitle">
+                Choose your race and class wisely. Your decisions will shape your destiny in the Atlas realm.
+            </p>
+        </div>
+
+        <!-- Main Form -->
+        <form asp-action="Create" method="post" id="createForm">
+            <div asp-validation-summary="All" class="atlas-validation-summary"></div>
+
+            <!-- ============================================================ -->
+            <!-- SECTION 1: Race Selection -->
+            <!-- ============================================================ -->
+            <div class="atlas-card atlas-card--glow atlas-create-section atlas-fade-in atlas-fade-in-delay-1">
+                <div class="atlas-create-section__gradient-bar"></div>
+
+                <div class="atlas-card__header">
+                    <div class="atlas-card__header-title">
+                        <div class="atlas-section-icon atlas-section-icon--race">
+                            <i class="fas fa-dna"></i>
+                        </div>
+                        <div>
+                            <h3 class="atlas-create-section__title">Choose Your Race</h3>
+                            <p class="atlas-create-section__subtitle">Each race grants unique passive abilities</p>
+                        </div>
+                    </div>
+                    <div class="atlas-create-section__status" id="raceStatus">
+                        <span class="atlas-badge atlas-badge--primary atlas-badge--dim">
+                            <i class="fas fa-circle-dot"></i> Not selected
+                        </span>
+                    </div>
+                </div>
+
+                <div class="atlas-card__body">
+                    <div class="atlas-race-grid">
+                        @foreach (var race in Enum.GetValues<AtlasRPG.Core.Enums.RaceType>())
+                        {
+                            var raceInfo = race switch
+                            {
+                                AtlasRPG.Core.Enums.RaceType.Human => new
+                                {
+                                    Icon = "fas fa-user",
+                                    Passive = "Adaptive Growth",
+                                    Desc = "+1 stat point per turn. Versatile and ever-growing.",
+                                    Color = "primary",
+                                    Lore = "Masters of adaptation, humans thrive in any environment.",
+                                    Stats = new[] { "Balanced", "+1 Pt/Turn", "Versatile" }
+                                },
+                                AtlasRPG.Core.Enums.RaceType.Dwarf => new
+                                {
+                                    Icon = "fas fa-hammer",
+                                    Passive = "Stonehide",
+                                    Desc = "+5% Armor. Debuffs last 1 turn less.",
+                                    Color = "gold",
+                                    Lore = "Born of mountain stone, dwarves endure what others cannot.",
+                                    Stats = new[] { "High Def", "Debuff Resist", "+5% Armor" }
+                                },
+                                AtlasRPG.Core.Enums.RaceType.Orc => new
+                                {
+                                    Icon = "fas fa-fist-raised",
+                                    Passive = "Bloodlust",
+                                    Desc = "Bonus damage after PVP win. Fueled by battle.",
+                                    Color = "danger",
+                                    Lore = "War is not just a means — it is the way of the Orc.",
+                                    Stats = new[] { "High DMG", "PVP Bonus", "Aggressive" }
+                                },
+                                AtlasRPG.Core.Enums.RaceType.Undead => new
+                                {
+                                    Icon = "fas fa-skull",
+                                    Passive = "Unfeeling",
+                                    Desc = "Wounds don't affect you. Beyond pain, beyond fear.",
+                                    Color = "indigo",
+                                    Lore = "Death was merely the beginning of their true existence.",
+                                    Stats = new[] { "Wound Immune", "Sustained", "Resilient" }
+                                },
+                                AtlasRPG.Core.Enums.RaceType.Drakoid => new
+                                {
+                                    Icon = "fas fa-dragon",
+                                    Passive = "Scaled Hide",
+                                    Desc = "+5% All Resistance. Ancient draconic blood flows within.",
+                                    Color = "accent",
+                                    Lore = "Descendants of dragons, their scales deflect all elements.",
+                                    Stats = new[] { "+5% All Resist", "Elemental", "Draconic" }
+                                },
+                                _ => new
+                                {
+                                    Icon = "fas fa-question",
+                                    Passive = "Unknown",
+                                    Desc = "",
+                                    Color = "primary",
+                                    Lore = "",
+                                    Stats = Array.Empty<string>()
+                                }
+                            };
+
+                            <label class="atlas-race-card" data-race="@race">
+                                <input type="radio"
+                                       asp-for="Race"
+                                       value="@((int)race)"
+                                       class="atlas-race-card__input" />
+
+                                <div class="atlas-race-card__content atlas-race-card--@raceInfo.Color">
+                                    <!-- Race Image Area -->
+                                    <div class="atlas-race-card__image-area">
+                                        <!--
+                                            Resim geldiğinde placeholder'ı kaldırıp şunu ekleyin:
+                                            <img src="~/images/races/@(race.ToString().ToLower()).png"
+                                                 alt="@race"
+                                                 class="atlas-race-card__image" />
+                                        -->
+                                        <div class="atlas-race-card__image-placeholder">
+                                            <i class="@raceInfo.Icon"></i>
+                                        </div>
+                                        <div class="atlas-race-card__image-overlay"></div>
+
+                                        <div class="atlas-race-card__check">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                    </div>
+
+                                    <!-- Race Info -->
+                                    <div class="atlas-race-card__info">
+                                        <h4 class="atlas-race-card__name">@race</h4>
+                                        <div class="atlas-race-card__passive">
+                                            <i class="fas fa-star"></i>
+                                            <span>@raceInfo.Passive</span>
+                                        </div>
+                                        <p class="atlas-race-card__desc">@raceInfo.Desc</p>
+                                        <div class="atlas-race-card__tags">
+                                            @foreach (var stat in raceInfo.Stats)
+                                            {
+                                                <span class="atlas-race-card__tag">@stat</span>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="atlas-race-card__glow"></div>
+                                </div>
+                            </label>
+                        }
+                    </div>
+                    <span asp-validation-for="Race" class="atlas-form-error"></span>
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="atlas-create-divider atlas-fade-in atlas-fade-in-delay-2">
+                <div class="atlas-create-divider__line"></div>
+                <div class="atlas-create-divider__icon">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <div class="atlas-create-divider__line"></div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- SECTION 2: Class Selection -->
+            <!-- ============================================================ -->
+            <div class="atlas-card atlas-card--glow atlas-create-section atlas-fade-in atlas-fade-in-delay-3">
+                <div class="atlas-create-section__gradient-bar atlas-create-section__gradient-bar--accent"></div>
+
+                <div class="atlas-card__header">
+                    <div class="atlas-card__header-title">
+                        <div class="atlas-section-icon atlas-section-icon--class">
+                            <i class="fas fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <h3 class="atlas-create-section__title">Choose Your Class</h3>
+                            <p class="atlas-create-section__subtitle">Your combat style, skills, and equipment</p>
+                        </div>
+                    </div>
+                    <div class="atlas-create-section__status" id="classStatus">
+                        <span class="atlas-badge atlas-badge--accent atlas-badge--dim">
+                            <i class="fas fa-circle-dot"></i> Not selected
+                        </span>
+                    </div>
+                </div>
+
+                <div class="atlas-card__body">
+                    <div class="atlas-class-grid">
+                        @foreach (var classType in Enum.GetValues<AtlasRPG.Core.Enums.ClassType>())
+                        {
+                            var classInfo = classType switch
+                            {
+                                AtlasRPG.Core.Enums.ClassType.Warrior => new
+                                {
+                                    Icon = "fas fa-shield-alt",
+                                    Role = "Tank",
+                                    Desc = "High survivability with block counter mechanics. The frontline fortress.",
+                                    Color = "primary",
+                                    PrimaryStat = "Vitality & Strength",
+                                    Playstyle = "Defensive",
+                                    Difficulty = 1
+                                },
+                                AtlasRPG.Core.Enums.ClassType.Rogue => new
+                                {
+                                    Icon = "fas fa-user-ninja",
+                                    Role = "Burst DPS",
+                                    Desc = "High crit damage with dual wield capability. Strike from the shadows.",
+                                    Color = "accent",
+                                    PrimaryStat = "Dexterity & Agility",
+                                    Playstyle = "Aggressive",
+                                    Difficulty = 3
+                                },
+                                AtlasRPG.Core.Enums.ClassType.Archer => new
+                                {
+                                    Icon = "fas fa-bullseye",
+                                    Role = "Tempo",
+                                    Desc = "First strike advantage with target marking. Control the battlefield.",
+                                    Color = "success",
+                                    PrimaryStat = "Dexterity & Luck",
+                                    Playstyle = "Strategic",
+                                    Difficulty = 2
+                                },
+                                AtlasRPG.Core.Enums.ClassType.Mage => new
+                                {
+                                    Icon = "fas fa-hat-wizard",
+                                    Role = "Spell Caster",
+                                    Desc = "Elemental damage with mana scaling. Unleash arcane devastation.",
+                                    Color = "indigo",
+                                    PrimaryStat = "Intelligence & Wisdom",
+                                    Playstyle = "Burst Magic",
+                                    Difficulty = 3
+                                },
+                                AtlasRPG.Core.Enums.ClassType.Berserker => new
+                                {
+                                    Icon = "fas fa-fire",
+                                    Role = "Rage DPS",
+                                    Desc = "Damage increases as HP drops. The closer to death, the more dangerous.",
+                                    Color = "danger",
+                                    PrimaryStat = "Strength & Vitality",
+                                    Playstyle = "High Risk",
+                                    Difficulty = 2
+                                },
+                                _ => new
+                                {
+                                    Icon = "fas fa-question",
+                                    Role = "Unknown",
+                                    Desc = "",
+                                    Color = "primary",
+                                    PrimaryStat = "",
+                                    Playstyle = "",
+                                    Difficulty = 1
+                                }
+                            };
+
+                            <label class="atlas-class-card" data-class="@classType">
+                                <input type="radio"
+                                       asp-for="Class"
+                                       value="@((int)classType)"
+                                       class="atlas-class-card__input" />
+
+                                <div class="atlas-class-card__content atlas-class-card--@classInfo.Color">
+                                    <div class="atlas-class-card__icon-area">
+                                        <div class="atlas-class-card__icon-circle">
+                                            <i class="@classInfo.Icon"></i>
+                                        </div>
+                                        <div class="atlas-class-card__check">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                    </div>
+
+                                    <div class="atlas-class-card__info">
+                                        <div class="atlas-class-card__header">
+                                            <h4 class="atlas-class-card__name">@classType</h4>
+                                            <span class="atlas-class-card__role">@classInfo.Role</span>
+                                        </div>
+                                        <p class="atlas-class-card__desc">@classInfo.Desc</p>
+                                        <div class="atlas-class-card__meta">
+                                            <div class="atlas-class-card__meta-item">
+                                                <span class="atlas-label">Primary</span>
+                                                <span>@classInfo.PrimaryStat</span>
+                                            </div>
+                                            <div class="atlas-class-card__meta-item">
+                                                <span class="atlas-label">Style</span>
+                                                <span>@classInfo.Playstyle</span>
+                                            </div>
+                                            <div class="atlas-class-card__meta-item">
+                                                <span class="atlas-label">Difficulty</span>
+                                                <div class="atlas-class-card__difficulty">
+                                                    @for (int i = 0; i < 3; i++)
+                                                    {
+                                                        <span class="atlas-class-card__diff-dot @(i < classInfo.Difficulty ? "atlas-class-card__diff-dot--active" : "")"></span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="atlas-class-card__glow"></div>
+                                </div>
+                            </label>
+                        }
+                    </div>
+                    <span asp-validation-for="Class" class="atlas-form-error"></span>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- Submit Bar (Sticky) -->
+            <!-- ============================================================ -->
+            <div class="atlas-create-submit-bar atlas-fade-in atlas-fade-in-delay-4" id="submitBar">
+                <div class="atlas-create-submit-bar__inner">
+                    <!-- Summary -->
+                    <div class="atlas-create-submit-bar__summary">
+                        <div class="atlas-create-submit-bar__pick" id="summaryRaceWrap">
+                            <span class="atlas-label">Race</span>
+                            <span class="atlas-create-submit-bar__value atlas-create-submit-bar__value--empty" id="summaryRace">
+                                —
+                            </span>
+                        </div>
+                        <div class="atlas-create-submit-bar__separator">+</div>
+                        <div class="atlas-create-submit-bar__pick" id="summaryClassWrap">
+                            <span class="atlas-label">Class</span>
+                            <span class="atlas-create-submit-bar__value atlas-create-submit-bar__value--empty" id="summaryClass">
+                                —
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit"
+                            class="atlas-btn atlas-btn--accent atlas-btn--lg atlas-create-submit"
+                            id="btnSubmit"
+                            disabled>
+                        <i class="fas fa-bolt"></i>
+                        Begin Your Journey
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Flavor Text -->
+        <div class="atlas-create-flavor atlas-fade-in atlas-fade-in-delay-5">
+            <p>
+                <i class="fas fa-scroll"></i>
+                <em>"Every legend begins with a single choice. Choose well, champion."</em>
+            </p>
+        </div>
+
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/create-character.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/create-character.js" asp-append-version="true"></script>
+}

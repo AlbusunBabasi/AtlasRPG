@@ -1,0 +1,167 @@
+﻿<!-- AtlasRPG.Web/Views/Home/Index.cshtml -->
+@{
+    ViewData["Title"] = "Home";
+}
+
+<section class="atlas-hero">
+    <div class="atlas-hero__decoration"></div>
+
+    <div class="atlas-hero__badge">
+        <i class="bi bi-lightning-charge-fill"></i>
+        <span>Season 1 is Live</span>
+    </div>
+
+    <h1 class="atlas-display-1 atlas-hero__title">
+        <span class="atlas-text-gradient">ATLAS</span>
+        <span style="color: var(--atlas-text-primary);">RPG</span>
+    </h1>
+
+    <p class="atlas-hero__subtitle">
+        Forge your champion in the asynchronous PVP arena.
+        Build powerful characters, collect legendary gear,
+        and dominate the eternal ladder.
+    </p>
+
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div class="atlas-hero__actions">
+            <a asp-controller="Game" asp-action="Dashboard" class="atlas-btn atlas-btn--primary atlas-btn--xl">
+                <i class="bi bi-controller"></i>
+                Go to Dashboard
+            </a>
+            <a asp-controller="Run" asp-action="Create" class="atlas-btn atlas-btn--accent atlas-btn--xl">
+                <i class="bi bi-lightning-charge-fill"></i>
+                Start New Run
+            </a>
+        </div>
+
+        <div class="d-flex justify-content-center flex-wrap gap-3 atlas-mt-2xl atlas-fade-in atlas-fade-in-delay-4">
+            <div class="atlas-stat atlas-stat--primary">
+                <span class="atlas-stat__icon"><i class="bi bi-person-fill"></i></span>
+                <span class="atlas-stat__value">@User.Identity.Name</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="atlas-hero__actions">
+            <a asp-controller="Account" asp-action="Register" class="atlas-btn atlas-btn--primary atlas-btn--xl">
+                <i class="bi bi-person-plus-fill"></i>
+                Begin Your Journey
+            </a>
+            <a asp-controller="Account" asp-action="Login" class="atlas-btn atlas-btn--secondary atlas-btn--xl">
+                <i class="bi bi-box-arrow-in-right"></i>
+                Login
+            </a>
+        </div>
+    }
+</section>
+
+<hr class="atlas-divider">
+
+@if (User.Identity?.IsAuthenticated != true)
+{
+    <section class="atlas-mt-xl">
+        <div class="atlas-section-header justify-content-center">
+            <div class="atlas-section-header__icon">
+                <i class="bi bi-stars"></i>
+            </div>
+            <div class="atlas-section-header__text text-center">
+                <h3 class="atlas-heading">Game Features</h3>
+                <p>Everything you need for an epic adventure</p>
+            </div>
+        </div>
+
+        <div class="row g-4 atlas-mt-lg">
+            <div class="col-md-4 col-sm-6 atlas-fade-in atlas-fade-in-delay-1">
+                <div class="atlas-feature">
+                    <div class="atlas-feature__icon">
+                        <i class="bi bi-bullseye"></i>
+                    </div>
+                    <h4 class="atlas-feature__title">Run-Based Gameplay</h4>
+                    <p class="atlas-feature__desc">
+                        20 turns per run with a perfect mix of PVE encounters and PVP battles.
+                        Every decision shapes your fate.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6 atlas-fade-in atlas-fade-in-delay-2">
+                <div class="atlas-feature">
+                    <div class="atlas-feature__icon">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <h4 class="atlas-feature__title">Asynchronous PVP</h4>
+                    <p class="atlas-feature__desc">
+                        Battle against snapshots of real players. Climb the ladder at your own pace,
+                        no waiting required.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6 atlas-fade-in atlas-fade-in-delay-3">
+                <div class="atlas-feature">
+                    <div class="atlas-feature__icon">
+                        <i class="bi bi-shield-shaded"></i>
+                    </div>
+                    <h4 class="atlas-feature__title">5 Races & 5 Classes</h4>
+                    <p class="atlas-feature__desc">
+                        Each combination offers unique abilities and synergies.
+                        Find your perfect playstyle.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6 atlas-fade-in atlas-fade-in-delay-3">
+                <div class="atlas-feature">
+                    <div class="atlas-feature__icon">
+                        <i class="bi bi-box-seam-fill"></i>
+                    </div>
+                    <h4 class="atlas-feature__title">Dynamic Items</h4>
+                    <p class="atlas-feature__desc">
+                        3 rarity tiers, 3 affix tiers, and endless combinations.
+                        Every item tells a different story.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6 atlas-fade-in atlas-fade-in-delay-4">
+                <div class="atlas-feature">
+                    <div class="atlas-feature__icon">
+                        <i class="bi bi-diagram-3-fill"></i>
+                    </div>
+                    <h4 class="atlas-feature__title">Passive Skill Tree</h4>
+                    <p class="atlas-feature__desc">
+                        60+ nodes to customize your build. Specialize or diversify —
+                        the choice is yours.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6 atlas-fade-in atlas-fade-in-delay-5">
+                <div class="atlas-feature">
+                    <div class="atlas-feature__icon">
+                        <i class="bi bi-coin"></i>
+                    </div>
+                    <h4 class="atlas-feature__title">Economy & Upgrades</h4>
+                    <p class="atlas-feature__desc">
+                        Shop, reroll, and upgrade your gear. Manage gold wisely to
+                        maximize your champion's power.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="atlas-mt-2xl atlas-mb-2xl">
+        <div class="atlas-card atlas-card--glow">
+            <div class="atlas-card__body text-center" style="padding: 3rem;">
+                <h2 class="atlas-heading atlas-mb-md">Ready to Forge Your Legend?</h2>
+                <p class="atlas-subheading atlas-mb-xl">
+                    Join thousands of players in the eternal arena.
+                    Your journey begins with a single step.
+                </p>
+                <a asp-controller="Account" asp-action="Register" class="atlas-btn atlas-btn--primary atlas-btn--xl">
+                    <i class="bi bi-lightning-charge-fill"></i>
+                    Create Free Account
+                </a>
+            </div>
+        </div>
+    </section>
+}

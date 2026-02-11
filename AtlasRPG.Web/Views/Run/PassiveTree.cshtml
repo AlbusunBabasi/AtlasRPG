@@ -1,0 +1,454 @@
+﻿@* AtlasRPG.Web/Views/Run/PassiveTree.cshtml *@
+@model AtlasRPG.Web.Models.RunViews.PassiveTreeViewModel
+
+@{
+    ViewData["Title"] = "Passive Tree";
+
+    // ── Path Definitions ─────────────────────────────────────────
+    // NodeId sıra numarasına göre hangi path'e düştüğünü belirler
+    static int NodeNum(string nodeId) =>
+        int.TryParse(nodeId.TrimStart('N'), out int n) ? n : 0;
+
+    var pathDefs = new[]
+    {
+        new { Id = "core",      Label = "⭕ Core",        From = 1,  To = 1  },
+        new { Id = "offense",   Label = "⚔️ Offense",     From = 2,  To = 7  },
+        new { Id = "defense",   Label = "🛡️ Defense",     From = 8,  To = 13 },
+        new { Id = "utility",   Label = "⚡ Utility",     From = 14, To = 19 },
+        new { Id = "bow",       Label = "🏹 Bow",         From = 20, To = 26 },
+        new { Id = "dagger",    Label = "🗡️ Dagger",      From = 27, To = 33 },
+        new { Id = "sword1h",   Label = "⚔️ 1H Sword",    From = 34, To = 40 },
+        new { Id = "twohands",  Label = "⚔️ 2H Sword",   From = 41, To = 47 },
+        new { Id = "wand",      Label = "🪄 Wand",        From = 48, To = 54 },
+        new { Id = "staff",     Label = "🔮 Staff",       From = 55, To = 60 },
+    };
+
+    string NodeTypeBadgeClass(string nt) => nt switch
+    {
+        "Notable" => "bg-primary",
+        "Keystone" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    string NodeTypeBorderClass(string nt) => nt switch
+    {
+        "Notable" => "node-notable",
+        "Keystone" => "node-keystone",
+        _ => "node-minor"
+    };
+}
+
+<div class="container-fluid mt-3 px-3">
+
+    @* ── Header Bar ─────────────────────────────────────────────── *@
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">🌳 Passive Tree</h4>
+            <small class="text-muted">Level @Model.CurrentLevel</small>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-info fs-6 px-3 py-2">
+                💎 @Model.AvailablePoints point@(Model.AvailablePoints != 1 ? "s" : "") remaining
+            </span>
+            <form asp-action="ResetPassiveTree" method="post" class="d-inline"
+                  onsubmit="return confirm('Reset all passives? Points will be refunded.');">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="runId" value="@Model.RunId" />
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    🔄 Reset Tree
+                </button>
+            </form>
+            <a asp-action="TurnHub" asp-route-id="@Model.RunId" class="btn btn-outline-secondary btn-sm">
+                ← Back to Hub
+            </a>
+        </div>
+    </div>
+
+    @* ── Alerts ──────────────────────────────────────────────────── *@
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show py-2" role="alert">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show py-2" role="alert">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Info"] != null)
+    {
+        <div class="alert alert-info alert-dismissible fade show py-2" role="alert">
+            @TempData["Info"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* ── Summary Pills ───────────────────────────────────────────── *@
+    <div class="d-flex gap-2 flex-wrap mb-3">
+        @{
+            int totalAllocated = Model.AllocatedNodeIds.Count;
+            int totalMinor = Model.Nodes.Count(n => n.IsAllocated && n.NodeType == "Minor");
+            int totalNotable = Model.Nodes.Count(n => n.IsAllocated && n.NodeType == "Notable");
+            int totalKeystone = Model.Nodes.Count(n => n.IsAllocated && n.NodeType == "Keystone");
+        }
+        <span class="badge bg-dark">📊 Allocated: @totalAllocated</span>
+        <span class="badge bg-secondary">Minor: @totalMinor</span>
+        <span class="badge bg-primary">Notable: @totalNotable</span>
+        <span class="badge bg-warning text-dark">Keystone: @totalKeystone</span>
+    </div>
+
+    @* ── Path Tabs ───────────────────────────────────────────────── *@
+    <ul class="nav nav-tabs mb-3" id="pathTabs" role="tablist">
+        @for (int i = 0; i < pathDefs.Length; i++)
+        {
+            var path = pathDefs[i];
+            var nodesInPath = Model.Nodes.Where(n => NodeNum(n.NodeId) >= path.From && NodeNum(n.NodeId) <= path.To).ToList();
+            int allocCount = nodesInPath.Count(n => n.IsAllocated);
+            int availCount = nodesInPath.Count(n => n.IsAllocatable);
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(i == 0 ? "active" : "")"
+                        id="tab-@path.Id"
+                        data-bs-toggle="tab"
+                        data-bs-target="#pane-@path.Id"
+                        type="button" role="tab">
+                    @path.Label
+                    @if (allocCount > 0)
+                    {
+                        <span class="badge bg-warning text-dark ms-1">@allocCount</span>
+                    }
+                    @if (availCount > 0)
+                    {
+                        <span class="badge bg-success ms-1">@availCount</span>
+                    }
+                </button>
+            </li>
+        }
+    </ul>
+
+    @* ── Tab Panes ───────────────────────────────────────────────── *@
+    <div class="tab-content" id="pathTabContent">
+        @for (int i = 0; i < pathDefs.Length; i++)
+        {
+            var path = pathDefs[i];
+            var nodesInPath = Model.Nodes
+            .Where(n => NodeNum(n.NodeId) >= path.From && NodeNum(n.NodeId) <= path.To)
+            .OrderBy(n => NodeNum(n.NodeId))
+            .ToList();
+
+            <div class="tab-pane fade @(i == 0 ? "show active" : "")"
+                 id="pane-@path.Id" role="tabpanel">
+
+                @if (!nodesInPath.Any())
+                {
+                    <p class="text-muted">No nodes in this path.</p>
+                }
+                else
+                {
+                    @* Node chain with arrows *@
+                    <div class="node-chain d-flex align-items-start flex-wrap gap-0">
+                        @for (int j = 0; j < nodesInPath.Count; j++)
+                        {
+                            var node = nodesInPath[j];
+
+                            @* Arrow between nodes *@
+                            @if (j > 0)
+                            {
+                                <div class="node-arrow">→</div>
+                            }
+
+                            @* Node Card *@
+                            <div class="node-card @NodeTypeBorderClass(node.NodeType) @(node.IsAllocated ? "node-allocated" : "") @(node.IsAllocatable ? "node-available" : "") @(!node.IsAllocated && !node.IsAllocatable ? "node-locked" : "")"
+                                 data-bs-toggle="tooltip"
+                                 data-bs-placement="top"
+                                 title="@node.Description | Req Lv @node.RequiredLevel">
+
+                                @* Type badge *@
+                                <span class="badge @NodeTypeBadgeClass(node.NodeType) node-type-badge">
+                                    @node.NodeType
+                                </span>
+
+                                @* Node ID *@
+                                <div class="node-id">@node.NodeId</div>
+
+                                @* Name *@
+                                <div class="node-name">@node.DisplayName</div>
+
+                                @* Status icon *@
+                                <div class="node-status">
+                                    @if (node.IsAllocated)
+                                    {
+                                        <span class="text-warning">✓ Taken</span>
+                                    }
+                                    else if (node.IsAllocatable)
+                                    {
+                                        <span class="text-success">● Available</span>
+                                    }
+                                    else if (Model.CurrentLevel < node.RequiredLevel)
+                                    {
+                                        <span class="text-danger">Lv @node.RequiredLevel</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">🔒 Locked</span>
+                                    }
+                                </div>
+
+                                @* Allocate Button *@
+                                @if (node.IsAllocatable)
+                                {
+                                    <form asp-action="AllocateNode" method="post" class="mt-1">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="runId" value="@Model.RunId" />
+                                        <input type="hidden" name="nodeId" value="@node.NodeId" />
+                                        <button type="submit" class="btn btn-success btn-sm w-100">
+                                            + Allocate
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @* ── Node Detail Accordion ──────────────────────────── *@
+                    <div class="accordion mt-3" id="acc-@path.Id">
+                        <div class="accordion-item bg-dark border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-dark text-light py-2" type="button"
+                                        data-bs-toggle="collapse" data-bs-target="#detail-@path.Id">
+                                    📋 Node Details
+                                </button>
+                            </h2>
+                            <div id="detail-@path.Id" class="accordion-collapse collapse">
+                                <div class="accordion-body p-2">
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-sm table-bordered mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width:55px">Node</th>
+                                                    <th>Name</th>
+                                                    <th>Type</th>
+                                                    <th>Req Lv</th>
+                                                    <th>Status</th>
+                                                    <th>Effect</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var node in nodesInPath)
+                                                {
+                                                    <tr class="@(node.IsAllocated ? "table-warning" : node.IsAllocatable ? "table-success" : "")">
+                                                        <td><code>@node.NodeId</code></td>
+                                                        <td>@node.DisplayName</td>
+                                                        <td>
+                                                            <span class="badge @NodeTypeBadgeClass(node.NodeType)">
+                                                                @node.NodeType
+                                                            </span>
+                                                        </td>
+                                                        <td>@node.RequiredLevel</td>
+                                                        <td>
+                                                            @if (node.IsAllocated)
+                                                            {
+                                                                <text>✅ Taken</text>
+                                                            }
+                                                            else if (node.IsAllocatable)
+                                                            {
+                                                                <text>🟢 Available</text>
+                                                            }
+                                                            else
+                                                            {
+                                                                <text>🔒 Locked</text>
+                                                            }
+                                                        </td>
+                                                        <td><small class="text-muted">@node.Description</small></td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* ── Legend ─────────────────────────────────────────────────── *@
+    <div class="d-flex gap-3 mt-4 flex-wrap">
+        <span class="legend-item node-allocated">✓ Allocated</span>
+        <span class="legend-item node-available">● Available</span>
+        <span class="legend-item node-locked">🔒 Locked</span>
+        <span class="legend-item"><span class="badge bg-secondary">Minor</span></span>
+        <span class="legend-item"><span class="badge bg-primary">Notable</span></span>
+        <span class="legend-item"><span class="badge bg-warning text-dark">Keystone</span></span>
+    </div>
+
+</div>
+
+@* ─────────────────────────────────────────────────────────────── *@
+@section Scripts {
+    <script>
+        // Bootstrap tooltips
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+            new bootstrap.Tooltip(el, { trigger: 'hover' });
+        });
+    </script>
+}
+
+@* ─────────────────────────────────────────────────────────────── *@
+<style>
+    /* ── Node Chain Layout ─────────────────────────────────────── */
+    .node-chain {
+        padding: 12px 0;
+        overflow-x: auto;
+        flex-wrap: nowrap !important;
+    }
+
+    .node-arrow {
+        display: flex;
+        align-items: center;
+        font-size: 1.4rem;
+        color: #555;
+        padding: 0 4px;
+        margin-top: 28px; /* align with node center */
+    }
+
+    /* ── Node Card Base ──────────────────────────────────────────── */
+    .node-card {
+        width: 110px;
+        min-height: 120px;
+        border-radius: 8px;
+        padding: 6px;
+        text-align: center;
+        border: 2px solid #444;
+        background: #1a1a2e;
+        position: relative;
+        transition: transform 0.1s, box-shadow 0.1s;
+        flex-shrink: 0;
+    }
+
+        .node-card:hover {
+            transform: translateY(-2px);
+        }
+
+    /* ── Node Types ─────────────────────────────────────────────── */
+    .node-minor {
+        border-color: #555;
+        background: #1c1c2e;
+    }
+
+    .node-notable {
+        border-color: #4169e1;
+        background: #1a1a3e;
+    }
+
+    .node-keystone {
+        border-color: #ffd700;
+        background: #2a1f00;
+    }
+
+    /* ── Node States ─────────────────────────────────────────────── */
+    .node-allocated {
+        border-color: #ffd700 !important;
+        background: #2a1f00 !important;
+        box-shadow: 0 0 8px rgba(255,215,0,0.3);
+    }
+
+    .node-available {
+        border-color: #28a745 !important;
+        background: #0d2018 !important;
+        box-shadow: 0 0 8px rgba(40,167,69,0.4);
+        cursor: pointer;
+    }
+
+        .node-available:hover {
+            box-shadow: 0 0 14px rgba(40,167,69,0.6);
+        }
+
+    .node-locked {
+        opacity: 0.45;
+    }
+
+    /* ── Node Inner Parts ───────────────────────────────────────── */
+    .node-type-badge {
+        font-size: 0.6rem;
+        position: absolute;
+        top: 4px;
+        right: 4px;
+    }
+
+    .node-id {
+        font-size: 0.65rem;
+        color: #666;
+        margin-bottom: 2px;
+    }
+
+    .node-name {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #ddd;
+        line-height: 1.2;
+        min-height: 30px;
+        margin-bottom: 4px;
+    }
+
+    .node-status {
+        font-size: 0.65rem;
+        margin-bottom: 4px;
+    }
+
+    /* ── Legend ─────────────────────────────────────────────────── */
+    .legend-item {
+        font-size: 0.8rem;
+        color: #aaa;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* ── Accordion override ─────────────────────────────────────── */
+    .accordion-button::after {
+        filter: invert(1);
+    }
+
+    /* ── Nav tabs dark theme ──────────────────────────────────────── */
+    .nav-tabs .nav-link {
+        color: #aaa;
+        border-color: #444;
+        font-size: 0.82rem;
+        padding: 6px 10px;
+    }
+
+        .nav-tabs .nav-link.active {
+            color: #fff;
+            background-color: #1a1a2e;
+            border-color: #4169e1 #4169e1 #1a1a2e;
+        }
+
+        .nav-tabs .nav-link:hover:not(.active) {
+            color: #fff;
+            border-color: #555;
+        }
+
+    .nav-tabs {
+        border-color: #444;
+    }
+
+    /* ── Scrollbar for node chain ────────────────────────────────── */
+    .node-chain::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .node-chain::-webkit-scrollbar-track {
+        background: #111;
+    }
+
+    .node-chain::-webkit-scrollbar-thumb {
+        background: #444;
+        border-radius: 3px;
+    }
+</style>

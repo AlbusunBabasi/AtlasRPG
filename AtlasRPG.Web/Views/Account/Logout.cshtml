@@ -1,0 +1,66 @@
+﻿<!-- AtlasRPG.Web/Views/Account/Logout.cshtml -->
+@{
+    ViewData["Title"] = "Logout";
+}
+
+<div class="atlas-auth">
+    <div class="atlas-auth__container" style="max-width: 440px;">
+
+        <!-- Card -->
+        <div class="atlas-auth__card">
+            <div class="atlas-auth__card-body text-center">
+
+                <!-- Icon -->
+                <div class="atlas-logout__icon">
+                    <i class="bi bi-box-arrow-right"></i>
+                </div>
+
+                <!-- Title -->
+                <h2 class="atlas-logout__title">Leaving the Arena?</h2>
+
+                <!-- Description -->
+                <p class="atlas-logout__desc">
+                    Are you sure you want to sign out?
+                    Your progress is safely saved — you can return anytime.
+                </p>
+
+                <!-- Actions -->
+                <form method="post" asp-action="LogoutConfirmed">
+                    @Html.AntiForgeryToken()
+
+                    <div class="atlas-logout__actions">
+                        <a asp-controller="Home" asp-action="Index"
+                           class="atlas-btn atlas-btn--secondary atlas-btn--lg" style="min-width: 140px;">
+                            <i class="bi bi-arrow-left"></i>
+                            Stay
+                        </a>
+                        <button type="submit"
+                                class="atlas-btn atlas-btn--danger atlas-btn--lg" style="min-width: 140px;">
+                            <i class="bi bi-box-arrow-right"></i>
+                            Sign Out
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Info note -->
+                <div class="atlas-mt-xl" style="padding-top: var(--atlas-space-lg); border-top: 1px solid var(--atlas-border);">
+                    <p style="font-size: 0.82rem; color: var(--atlas-text-muted); margin: 0;">
+                        <i class="bi bi-info-circle"></i>
+                        Your active runs and inventory will be preserved.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Quick return link -->
+        <div class="text-center atlas-mt-xl atlas-fade-in atlas-fade-in-delay-2">
+            <a asp-controller="Game" asp-action="Dashboard"
+               class="atlas-btn atlas-btn--ghost">
+                <i class="bi bi-controller"></i>
+                Back to Dashboard
+            </a>
+        </div>
+
+    </div>
+</div>

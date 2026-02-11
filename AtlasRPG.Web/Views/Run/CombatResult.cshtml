@@ -1,0 +1,457 @@
+﻿@using AtlasRPG.Application.Services
+@model AtlasRPG.Core.Entities.Combat.CombatResult
+@{
+    ViewData["Title"] = Model.IsVictory ? "Victory!" : "Defeat";
+    bool runIsActive = ViewBag.RunIsActive ?? false;
+    Guid runId = ViewBag.RunId ?? Guid.Empty;
+}
+
+<div class="container mt-4">
+
+    <!-- ── Result Header ─────────────────────────────────────── -->
+    <div class="card mb-4">
+        <div class="card-body text-center py-5">
+            @if (Model.IsVictory)
+            {
+                <h1 class="display-3 text-success mb-3">✅ VICTORY!</h1>
+                <p class="lead">You have defeated your opponent!</p>
+            }
+            else
+            {
+                <h1 class="display-3 text-danger mb-3">❌ DEFEAT</h1>
+                <p class="lead">You have fallen in battle...</p>
+            }
+
+            <div class="mt-4">
+                @if (Model.WasSuddenDeath)
+                {
+                    <span class="badge bg-warning fs-5 me-2">
+                        ⚡ SUDDEN DEATH (@Model.SuddenDeathStacks stacks)
+                    </span>
+                }
+                <span class="badge bg-secondary fs-5">@Model.TotalRounds Rounds</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Stats Comparison ──────────────────────────────────── -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary">
+                    <h5 class="mb-0">👤 Your Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h3 class="text-danger">@Model.PlayerTotalDamageDealt.ToString("F0")</h3>
+                            <small>Damage Dealt</small>
+                        </div>
+                        <div class="col-4">
+                            <h3 class="text-warning">@Model.PlayerTotalDamageTaken.ToString("F0")</h3>
+                            <small>Damage Taken</small>
+                        </div>
+                        <div class="col-4">
+                            <h3 class="text-info">@Model.PlayerCriticalHits</h3>
+                            <small>Critical Hits</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger">
+                    <h5 class="mb-0">🤖 @Model.OpponentUsername</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h3 class="text-danger">@Model.OpponentTotalDamageDealt.ToString("F0")</h3>
+                            <small>Damage Dealt</small>
+                        </div>
+                        <div class="col-4">
+                            <h3 class="text-warning">@Model.OpponentTotalDamageTaken.ToString("F0")</h3>
+                            <small>Damage Taken</small>
+                        </div>
+                        <div class="col-4">
+                            <h3 class="text-info">@Model.OpponentCriticalHits</h3>
+                            <small>Critical Hits</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Combat Log ────────────────────────────────────────── -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">⚔️ Combat Log</h5>
+            <button class="btn btn-sm btn-outline-light"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#combatLog">
+                Toggle Log
+            </button>
+        </div>
+        <div class="collapse show" id="combatLog">
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-dark table-striped mb-0">
+                    <thead class="sticky-top bg-dark">
+                        <tr>
+                            <th style="width:60px;">Round</th>
+                            <th>Your Action</th>
+                            <th style="width:80px;">Dmg</th>
+                            <th style="width:100px;">Opp. HP</th>
+                            <th>Opponent Action</th>
+                            <th style="width:80px;">Dmg</th>
+                            <th style="width:100px;">Your HP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var round in Model.Rounds)
+                        {
+                            <tr>
+                                <td><strong>R@round.RoundNumber</strong></td>
+
+                                <!-- Player action -->
+                                <td>
+                                    @round.PlayerAction
+                                    @if (round.PlayerCrit)
+                                    {
+                                        <span class="badge bg-warning ms-1">CRIT</span>
+                                    }
+                                    @if (!round.PlayerHit)
+                                    {
+                                        <span class="badge bg-secondary ms-1">MISS</span>
+                                    }
+                                    @if (round.PlayerBlocked)
+                                    {
+                                        <span class="badge bg-info ms-1">BLOCK</span>
+                                    }
+                                </td>
+                                <td class="text-danger fw-bold">
+                                    @round.PlayerDamage.ToString("F0")
+                                </td>
+                                <td class="@(round.OpponentHpRemaining <= 0 ? "text-danger fw-bold" : "")">
+                                    @Math.Max(0, round.OpponentHpRemaining).ToString("F0")
+                                </td>
+
+                                <!-- Opponent action -->
+                                <td>
+                                    @round.OpponentAction
+                                    @if (round.OpponentCrit)
+                                    {
+                                        <span class="badge bg-warning ms-1">CRIT</span>
+                                    }
+                                    @if (!round.OpponentHit)
+                                    {
+                                        <span class="badge bg-secondary ms-1">MISS</span>
+                                    }
+                                    @if (round.OpponentBlocked)
+                                    {
+                                        <span class="badge bg-info ms-1">BLOCK</span>
+                                    }
+                                </td>
+                                <td class="text-danger fw-bold">
+                                    @round.OpponentDamage.ToString("F0")
+                                </td>
+                                <td class="@(round.PlayerHpRemaining <= 0 ? "text-danger fw-bold" : "")">
+                                    @Math.Max(0, round.PlayerHpRemaining).ToString("F0")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    @{
+        var loot = ViewBag.Loot as LootDropResult;
+        bool isPve = (bool)(ViewBag.IsPveTurn ?? false);
+    }
+
+    @if (isPve && loot != null)
+    {
+        <style>
+            .loot-section {
+                margin: 2rem 0;
+            }
+
+            .loot-header {
+                display: flex;
+                align-items: center;
+                gap: .75rem;
+                margin-bottom: 1rem;
+            }
+
+                .loot-header h5 {
+                    margin: 0;
+                    font-weight: 700;
+                }
+
+            .loot-count-badge {
+                background: #2a2a4a;
+                color: #9090c0;
+                font-size: .7rem;
+                font-weight: 700;
+                letter-spacing: 1px;
+                padding: .25rem .7rem;
+                border-radius: 999px;
+                border: 1px solid #3a3a6a;
+            }
+
+            .loot-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                gap: 1rem;
+            }
+
+            .loot-card {
+                background: #12121f;
+                border-radius: 12px;
+                padding: 1.1rem 1.2rem;
+                border: 1px solid transparent;
+                transition: transform .15s, border-color .15s;
+                position: relative;
+                overflow: hidden;
+            }
+
+                .loot-card:hover {
+                    transform: translateY(-2px);
+                }
+
+                /* Rarity renk şeridi */
+                .loot-card::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 3px;
+                }
+
+            .loot-normal {
+                border-color: #2a2a3a;
+            }
+
+                .loot-normal::before {
+                    background: #777;
+                }
+
+            .loot-magic {
+                border-color: #1a2a5a;
+            }
+
+                .loot-magic::before {
+                    background: linear-gradient(90deg,#4466cc,#6688ff);
+                }
+
+            .loot-rare {
+                border-color: #3a2800;
+            }
+
+                .loot-rare::before {
+                    background: linear-gradient(90deg,#cc8800,#ffcc44);
+                }
+
+            .loot-slot-badge {
+                font-size: .65rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1.5px;
+                color: #5050a0;
+                margin-bottom: .35rem;
+            }
+
+            .loot-item-name {
+                font-weight: 700;
+                font-size: 1rem;
+                margin-bottom: .5rem;
+            }
+
+            .loot-ilvl {
+                font-size: .72rem;
+                color: #5050a0;
+                margin-bottom: .6rem;
+            }
+
+            .loot-affixes {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+
+                .loot-affixes li {
+                    font-size: .8rem;
+                    color: #a0a0c0;
+                    padding: .15rem 0;
+                    border-bottom: 1px solid #1a1a2a;
+                }
+
+                    .loot-affixes li:last-child {
+                        border-bottom: none;
+                    }
+
+            .tier-badge {
+                display: inline-block;
+                font-size: .6rem;
+                font-weight: 700;
+                padding: .1rem .4rem;
+                border-radius: 4px;
+                margin-left: .3rem;
+            }
+
+            .t1 {
+                background: #1a2a1a;
+                color: #66bb6a;
+            }
+
+            .t2 {
+                background: #1a1a3a;
+                color: #64b5f6;
+            }
+
+            .t3 {
+                background: #2a1a2a;
+                color: #ce93d8;
+            }
+
+            .equip-btn {
+                margin-top: .75rem;
+                width: 100%;
+                background: #1a1a3a;
+                color: #8888cc;
+                border: 1px solid #2a2a5a;
+                border-radius: 8px;
+                padding: .45rem;
+                font-size: .8rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all .15s;
+                text-decoration: none;
+                display: block;
+                text-align: center;
+            }
+
+                .equip-btn:hover {
+                    background: #2a2a5a;
+                    border-color: #4444aa;
+                    color: #aaaaee;
+                }
+
+            .no-loot-msg {
+                text-align: center;
+                color: #5050a0;
+                padding: 2rem;
+                font-size: .9rem;
+            }
+        </style>
+
+        <div class="loot-section">
+            <div class="loot-header">
+                <h5>
+                    @if (loot.IsVictory)
+                    {
+                        <span>🎁 Loot Dropped</span>
+                    }
+                    else
+                    {
+                        <span>📦 Consolation Loot</span>
+                    }
+                </h5>
+                <span class="loot-count-badge">@loot.Items.Count item@(loot.Items.Count != 1 ? "s" : "")</span>
+                @if (!loot.IsVictory)
+                {
+                    <span style="font-size:.75rem;color:#5050a0;">
+                        (PVE loss — 1 drop)
+                    </span>
+                }
+            </div>
+
+            @if (loot.Items.Any())
+            {
+                <div class="loot-grid">
+                    @foreach (var item in loot.Items)
+                    {
+                        string rarityClass = item.Rarity.ToLower() switch
+                        {
+                            "magic" => "loot-magic",
+                            "rare" => "loot-rare",
+                            _ => "loot-normal",
+                        };
+                        string rarityLabel = item.Rarity switch
+                        {
+                            "Magic" => "🔵 Magic",
+                            "Rare" => "🟡 Rare",
+                            _ => "⚪ Normal",
+                        };
+
+                        <div class="loot-card @rarityClass">
+                            <div class="loot-slot-badge">
+                                @(item.Slot == "Weapon" && item.WeaponType != null
+                                    ? item.WeaponType
+                                    : item.Slot)
+                            </div>
+                            <div class="loot-item-name">@rarityLabel @item.ItemName</div>
+                            <div class="loot-ilvl">ilvl @item.ItemLevel</div>
+
+                            @if (item.AffixSummaries.Any())
+                            {
+                                <ul class="loot-affixes">
+                                    @foreach (var aff in item.AffixSummaries)
+                                    {
+                                        <li>@Html.Raw(aff)</li>
+                                    }
+                                </ul>
+                            }
+
+                            @* Equip shortcut — inventory'deki RunItem ID ile *@
+                            <a href="/Run/Inventory/@(ViewBag.RunId)"
+                               class="equip-btn">
+                                📦 View in Inventory
+                            </a>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="no-loot-msg">No items generated — check LootService DI.</div>
+            }
+        </div>
+    }
+    else if (isPve)
+    {
+        @* PVE ama loot yoksa (TempData kaçtıysa) *@
+        <div class="alert alert-secondary mt-3">
+            🎒 Items added to inventory — check your bag in Turn Hub.
+        </div>
+    }
+
+    <!-- ── Continue Button ───────────────────────────────────── -->
+    <div class="text-center mb-5">
+        @if (runIsActive)
+        {
+            <!-- Run devam ediyor → TurnHub'a git -->
+            <form asp-action="ContinueRun" asp-controller="Run" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="runId" value="@runId" />
+                <button type="submit" class="btn btn-primary btn-lg px-5">
+                    ➡️ Continue to Next Turn
+                </button>
+            </form>
+        }
+        else
+        {
+            <!-- Run bitti (can 0 veya turn 20) → Summary'e git -->
+            <a asp-action="Summary" asp-controller="Run" asp-route-id="@runId"
+               class="btn btn-secondary btn-lg px-5">
+                🏁 View Run Summary
+            </a>
+        }
+    </div>
+
+</div>

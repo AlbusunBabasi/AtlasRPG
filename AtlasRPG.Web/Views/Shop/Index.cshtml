@@ -1,0 +1,332 @@
+﻿<!-- AtlasRPG.Web/Views/Shop/Index.cshtml -->
+@using AtlasRPG.Core.Entities.Runs
+@using AtlasRPG.Core.Entities.Items
+@{
+    ViewData["Title"] = "Shop";
+    var run = ViewBag.Run as Run;
+    var shopItems = ViewBag.ShopItems as List<Item>;
+}
+
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h4 class="mb-0">🛒 Shop - Turn @run.CurrentTurn</h4>
+                </div>
+                <div class="col-md-6 text-end">
+                    <span class="me-3 fs-5">💰 @run.Gold Gold</span>
+                    <a asp-controller="Run" asp-action="TurnHub" asp-route-id="@run.Id" class="btn btn-outline-light">
+                        ← Back to Turn Hub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Shop Inventory (Left Side) -->
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🏪 Shop Inventory</h5>
+                    <button class="btn btn-sm btn-warning" disabled>
+                        🔄 Reroll Shop (Coming Soon)
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @if (shopItems != null && shopItems.Any())
+                        {
+                            @foreach (var item in shopItems)
+                            {
+                                var price = ViewBag.ShopService?.CalculateItemPrice(item) ?? 0;
+                                // Alternative: call service directly (need to inject)
+                                int basePrice = 8 + (4 * item.ItemLevel);
+                                decimal rarityMultiplier = item.Rarity switch
+                                {
+                                    AtlasRPG.Core.Enums.ItemRarity.Normal => 1.0m,
+                                    AtlasRPG.Core.Enums.ItemRarity.Magic => 1.8m,
+                                    AtlasRPG.Core.Enums.ItemRarity.Rare => 3.0m,
+                                    _ => 1.0m
+                                };
+                                int itemPrice = (int)(basePrice * rarityMultiplier);
+
+                                <div class="col-md-6 mb-3">
+                                    <div class="card item-card h-100 rarity-@item.Rarity.ToString().ToLower()">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div>
+                                                    <h6 class="mb-0">
+                                                        @if (item.Slot == AtlasRPG.Core.Enums.ItemSlot.Weapon)
+                                                        {
+                                                            <text>🗡️ @item.WeaponType</text>
+                                                        }
+                                                        else if (item.Slot == AtlasRPG.Core.Enums.ItemSlot.Armor)
+                                                        {
+                                                            <text>🛡️ Armor</text>
+                                                        }
+                                                        else if (item.Slot == AtlasRPG.Core.Enums.ItemSlot.Belt)
+                                                        {
+                                                            <text>📿 Belt</text>
+                                                        }
+                                                        else
+                                                        {
+                                                            <text>🔰 Offhand</text>
+                                                        }
+                                                    </h6>
+                                                    <small class="text-muted">ilvl @item.ItemLevel</small>
+                                                </div>
+                                                <span class="badge bg-@(item.Rarity == AtlasRPG.Core.Enums.ItemRarity.Normal ? "secondary" : item.Rarity == AtlasRPG.Core.Enums.ItemRarity.Magic ? "primary" : "warning")">
+                                                    @item.Rarity
+                                                </span>
+                                            </div>
+
+                                            @if (item.Slot == AtlasRPG.Core.Enums.ItemSlot.Weapon)
+                                            {
+                                                <div class="small mb-2">
+                                                    <div>⚔️ Damage: @item.BaseDamage</div>
+                                                    <div>⚡ Speed: @item.BaseAttackSpeed</div>
+                                                    <div>💥 Crit: @((item.BaseCritChance * 100).ToString("F1"))%</div>
+                                                </div>
+                                            }
+
+                                            @if (item.Affixes.Any())
+                                            {
+                                                <div class="affixes mb-2">
+                                                    @foreach (var affix in item.Affixes)
+                                                    {
+                                                        <div class="small text-info">
+                                                            + @affix.AffixDefinition.DisplayName:
+                                                            @if (affix.AffixDefinition.IsPercentage)
+                                                            {
+                                                                <text>@((affix.RolledValue * 100).ToString("F1"))%</text>
+                                                            }
+                                                            else
+                                                            {
+                                                                <text>@affix.RolledValue.ToString("F0")</text>
+                                                            }
+                                                            <span class="badge badge-sm bg-dark">T@affix.Tier</span>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+
+                                            <div class="text-center mt-3">
+                                                <div class="mb-2">
+                                                    <strong class="text-warning">💰 @itemPrice Gold</strong>
+                                                </div>
+                                                <form asp-action="Buy" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="runId" value="@run.Id" />
+                                                    <input type="hidden" name="itemId" value="@item.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-success w-100" @(run.Gold < itemPrice ? "disabled" : "")>
+                                                        🛒 Buy
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="col-12">
+                                <p class="text-muted text-center">No items available</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Inventory (Right Side) -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🎒 Your Inventory</h5>
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    @if (run.Inventory.Any())
+                    {
+                        @foreach (var runItem in run.Inventory.OrderBy(i => i.IsEquipped ? 0 : 1))
+                        {
+                            var item = runItem.Item;
+
+                            int basePrice = 8 + (4 * item.ItemLevel);
+                            decimal rarityMultiplier = item.Rarity switch
+                            {
+                                AtlasRPG.Core.Enums.ItemRarity.Normal => 1.0m,
+                                AtlasRPG.Core.Enums.ItemRarity.Magic => 1.8m,
+                                AtlasRPG.Core.Enums.ItemRarity.Rare => 3.0m,
+                                _ => 1.0m
+                            };
+                            int sellPrice = (int)(basePrice * rarityMultiplier * 0.25m);
+                            int rerollCost = item.Rarity switch
+                            {
+                                AtlasRPG.Core.Enums.ItemRarity.Normal => 6 + (2 * item.ItemLevel),
+                                AtlasRPG.Core.Enums.ItemRarity.Magic => 10 + (3 * item.ItemLevel),
+                                AtlasRPG.Core.Enums.ItemRarity.Rare => 18 + (5 * item.ItemLevel),
+                                _ => 10
+                            };
+                            int upgradeCost = item.Rarity switch
+                            {
+                                AtlasRPG.Core.Enums.ItemRarity.Normal => 35 + (6 * item.ItemLevel),
+                                AtlasRPG.Core.Enums.ItemRarity.Magic => 70 + (10 * item.ItemLevel),
+                                _ => 0
+                            };
+
+                            <div class="card item-card mb-2 rarity-@item.Rarity.ToString().ToLower()">
+                                <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <div>
+                                            <strong class="small">
+                                                @if (item.Slot == AtlasRPG.Core.Enums.ItemSlot.Weapon)
+                                                {
+                                                    <text>🗡️ @item.WeaponType</text>
+                                                }
+                                                else if (item.Slot == AtlasRPG.Core.Enums.ItemSlot.Armor)
+                                                {
+                                                    <text>🛡️ Armor</text>
+                                                }
+                                                else if (item.Slot == AtlasRPG.Core.Enums.ItemSlot.Belt)
+                                                {
+                                                    <text>📿 Belt</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>🔰 Offhand</text>
+                                                }
+                                            </strong>
+                                            <small class="text-muted ms-1">ilvl @item.ItemLevel</small>
+                                        </div>
+                                        @if (runItem.IsEquipped)
+                                        {
+                                            <span class="badge bg-success">Equipped</span>
+                                        }
+                                    </div>
+
+                                    @if (item.Affixes.Any())
+                                    {
+                                        <div class="affixes mb-1">
+                                            @foreach (var affix in item.Affixes)
+                                            {
+                                                <div class="small text-info">
+                                                    @affix.AffixDefinition.DisplayName:
+                                                    @if (affix.AffixDefinition.IsPercentage)
+                                                    {
+                                                        <text>@((affix.RolledValue * 100).ToString("F1"))%</text>
+                                                    }
+                                                    else
+                                                    {
+                                                        <text>@affix.RolledValue.ToString("F0")</text>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+
+                                    @if (!runItem.IsEquipped)
+                                    {
+                                        <div class="btn-group btn-group-sm w-100 mt-2" role="group">
+                                            <!-- Sell -->
+                                            <form asp-action="Sell" method="post" class="flex-fill">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="runId" value="@run.Id" />
+                                                <input type="hidden" name="runItemId" value="@runItem.Id" />
+                                                <button type="submit" class="btn btn-outline-danger w-100" title="Sell for @sellPrice gold">
+                                                    💰 @sellPrice
+                                                </button>
+                                            </form>
+
+                                            <!-- Reroll -->
+                                            <form asp-action="Reroll" method="post" class="flex-fill">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="runId" value="@run.Id" />
+                                                <input type="hidden" name="runItemId" value="@runItem.Id" />
+                                                <button type="submit" class="btn btn-outline-warning w-100"
+                                                @(run.Gold < rerollCost ? "disabled" : "")
+                                                        title="Reroll affixes for @rerollCost gold">
+                                                    🔄 @rerollCost
+                                                </button>
+                                            </form>
+
+                                            <!-- Upgrade -->
+                                            @if (item.Rarity != AtlasRPG.Core.Enums.ItemRarity.Rare)
+                                            {
+                                                <form asp-action="Upgrade" method="post" class="flex-fill">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="runId" value="@run.Id" />
+                                                    <input type="hidden" name="runItemId" value="@runItem.Id" />
+                                                    <button type="submit" class="btn btn-outline-info w-100"
+                                                    @(run.Gold < upgradeCost ? "disabled" : "")
+                                                            title="Upgrade rarity for @upgradeCost gold">
+                                                        ⬆️ @upgradeCost
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center">Inventory is empty</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .item-card {
+        border: 2px solid;
+        transition: all 0.3s;
+    }
+
+    .rarity-normal {
+        border-color: #888;
+        background: rgba(136, 136, 136, 0.05);
+    }
+
+    .rarity-magic {
+        border-color: #4169E1;
+        background: rgba(65, 105, 225, 0.05);
+    }
+
+    .rarity-rare {
+        border-color: #FFD700;
+        background: rgba(255, 215, 0, 0.05);
+    }
+
+    .item-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .affixes {
+        border-left: 2px solid #17a2b8;
+        padding-left: 8px;
+    }
+</style>

@@ -1,0 +1,371 @@
+﻿<!-- AtlasRPG.Web/Views/Game/Dashboard.cshtml -->
+@{
+    ViewData["Title"] = "Dashboard";
+    var activeRun = ViewBag.ActiveRun as AtlasRPG.Core.Entities.Runs.Run;
+    var completedRuns = ViewBag.CompletedRuns as List<AtlasRPG.Core.Entities.Runs.Run>;
+}
+
+<!-- Dashboard Header -->
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-3 atlas-mt-lg atlas-mb-xl atlas-fade-in">
+    <div>
+        <h1 class="atlas-heading" style="margin-bottom: 0.25rem;">
+            Welcome back, <span class="atlas-text-gradient">@User.Identity?.Name</span>
+        </h1>
+        <p class="atlas-subheading mb-0">Your adventure awaits, champion.</p>
+    </div>
+    <div>
+        <a asp-controller="Run" asp-action="Create" class="atlas-btn atlas-btn--primary atlas-btn--lg">
+            <i class="bi bi-lightning-charge-fill"></i>
+            New Run
+        </a>
+    </div>
+</div>
+
+<!-- Active Run Section -->
+@if (activeRun != null)
+{
+    <div class="atlas-active-run atlas-fade-in atlas-fade-in-delay-1 atlas-mb-xl">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <!-- Run Header -->
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="atlas-section-header__icon"
+                         style="background: rgba(0, 210, 255, 0.1); border-color: rgba(0, 210, 255, 0.2);">
+                        <i class="bi bi-geo-alt-fill" style="color: var(--atlas-accent);"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; font-family: var(--atlas-font-display);">Active Run</h4>
+                        <p style="margin: 0; font-size: 0.85rem; color: var(--atlas-text-muted);">
+                            Your journey is in progress
+                        </p>
+                    </div>
+                    <span class="atlas-badge atlas-badge--success ms-2">
+                        <i class="bi bi-circle-fill" style="font-size: 0.5rem;"></i> LIVE
+                    </span>
+                </div>
+
+                <!-- Character Info -->
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="
+                        width: 56px; height: 56px;
+                        border-radius: var(--atlas-radius-lg);
+                        background: linear-gradient(135deg, var(--atlas-primary-subtle), rgba(99,102,241,0.1));
+                        border: 2px solid var(--atlas-primary);
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 1.6rem;
+                        box-shadow: var(--atlas-shadow-glow);
+                        ">
+                        ⚔️
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-family: var(--atlas-font-display); font-size: 1.3rem;">
+                            @activeRun.Race @activeRun.Class
+                        </h3>
+                        <div class="d-flex gap-2 mt-1">
+                            <span class="atlas-badge atlas-badge--level">
+                                <i class="bi bi-star-fill"></i> Level @activeRun.CurrentLevel
+                            </span>
+                            <span class="atlas-badge atlas-badge--primary">
+                                Turn @activeRun.CurrentTurn / 20
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="atlas-label">Run Progress</span>
+                        <span class="atlas-mono" style="font-size: 0.82rem; color: var(--atlas-text-secondary);">
+                            @activeRun.CurrentTurn / 20 Turns
+                        </span>
+                    </div>
+                    <div class="atlas-progress atlas-progress--labeled">
+                        <div class="atlas-progress__bar atlas-progress__bar--animated"
+                             style="width: @((activeRun.CurrentTurn / 20.0 * 100))%">
+                            <span class="atlas-progress__label">
+                                @((int)(activeRun.CurrentTurn / 20.0 * 100))%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="d-flex flex-wrap gap-2 atlas-active-run__stats">
+                    <div class="atlas-stat atlas-stat--gold">
+                        <span class="atlas-stat__icon">💰</span>
+                        <div>
+                            <div class="atlas-stat__value">@activeRun.Gold</div>
+                            <div class="atlas-stat__label">Gold</div>
+                        </div>
+                    </div>
+                    <div class="atlas-stat atlas-stat--danger">
+                        <span class="atlas-stat__icon">❤️</span>
+                        <div>
+                            <div class="atlas-stat__value">@activeRun.RemainingLives</div>
+                            <div class="atlas-stat__label">Lives</div>
+                        </div>
+                    </div>
+                    <div class="atlas-stat atlas-stat--info">
+                        <span class="atlas-stat__icon">⭐</span>
+                        <div>
+                            <div class="atlas-stat__value">@activeRun.PvpPoints</div>
+                            <div class="atlas-stat__label">PVP Pts</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Continue Button -->
+            <div class="col-lg-4 text-center text-lg-end mt-4 mt-lg-0">
+                <a asp-controller="Run" asp-action="TurnHub" asp-route-id="@activeRun.Id"
+                   class="atlas-btn atlas-btn--accent atlas-btn--xl">
+                    <i class="bi bi-play-fill"></i>
+                    Continue Run
+                </a>
+                <p class="atlas-mt-md" style="font-size: 0.8rem; color: var(--atlas-text-muted);">
+                    <i class="bi bi-clock"></i>
+                    @(20 - activeRun.CurrentTurn) turns remaining
+                </p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="atlas-card atlas-card--glow atlas-fade-in atlas-fade-in-delay-1 atlas-mb-xl">
+        <div class="atlas-card__body">
+            <div class="atlas-empty">
+                <div class="atlas-empty__icon">
+                    <i class="bi bi-lightning-charge"></i>
+                </div>
+                <h3 class="atlas-empty__title">No Active Run</h3>
+                <p class="atlas-empty__desc">
+                    Your arena awaits, champion. Start a new run to begin
+                    your quest for glory and legendary loot.
+                </p>
+                <a asp-controller="Run" asp-action="Create" class="atlas-btn atlas-btn--primary atlas-btn--xl">
+                    <i class="bi bi-lightning-charge-fill"></i>
+                    Start New Run
+                </a>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Quick Actions -->
+<div class="row g-4 atlas-mb-xl">
+    <div class="col-md-4 atlas-fade-in atlas-fade-in-delay-2">
+        <a asp-controller="Run" asp-action="Create" class="text-decoration-none">
+            <div class="atlas-card atlas-card--glow h-100" style="cursor: pointer;">
+                <div class="atlas-card__body atlas-card__body--compact text-center">
+                    <div class="atlas-feature__icon mx-auto mb-3">
+                        <i class="bi bi-plus-lg"></i>
+                    </div>
+                    <h5 style="font-family: var(--atlas-font-display); margin-bottom: 0.3rem;">New Run</h5>
+                    <p class="mb-0" style="font-size: 0.82rem; color: var(--atlas-text-muted);">
+                        Choose your race & class
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 atlas-fade-in atlas-fade-in-delay-3">
+        <a asp-controller="Game" asp-action="Leaderboard" class="text-decoration-none">
+            <div class="atlas-card atlas-card--gold h-100" style="cursor: pointer;">
+                <div class="atlas-card__body atlas-card__body--compact text-center">
+                    <div class="atlas-feature__icon mx-auto mb-3"
+                         style="background: rgba(245,166,35,0.08); border-color: rgba(245,166,35,0.15);">
+                        <i class="bi bi-trophy-fill" style="color: var(--atlas-gold);"></i>
+                    </div>
+                    <h5 style="font-family: var(--atlas-font-display); margin-bottom: 0.3rem;">Leaderboard</h5>
+                    <p class="mb-0" style="font-size: 0.82rem; color: var(--atlas-text-muted);">
+                        See top champions
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 atlas-fade-in atlas-fade-in-delay-4">
+        <div class="atlas-card h-100">
+            <div class="atlas-card__body atlas-card__body--compact text-center">
+                <div class="atlas-feature__icon mx-auto mb-3"
+                     style="background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.15);">
+                    <i class="bi bi-graph-up-arrow" style="color: var(--atlas-success);"></i>
+                </div>
+                <h5 style="font-family: var(--atlas-font-display); margin-bottom: 0.3rem;">Stats</h5>
+                <p class="mb-0" style="font-size: 0.82rem; color: var(--atlas-text-muted);">
+                    @(completedRuns?.Count ?? 0) runs completed
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Runs -->
+@if (completedRuns != null && completedRuns.Any())
+{
+    <div class="atlas-card atlas-fade-in atlas-fade-in-delay-5">
+        <div class="atlas-card__header">
+            <h5 class="atlas-card__header-title">
+                <i class="bi bi-journal-text"></i>
+                Recent Runs
+            </h5>
+            <span class="atlas-badge atlas-badge--primary">
+                @completedRuns.Count Total
+            </span>
+        </div>
+        <div class="atlas-card__body" style="padding: 0;">
+            <div class="table-responsive">
+                <table class="atlas-table">
+                    <thead>
+                        <tr>
+                            <th>Character</th>
+                            <th>Level</th>
+                            <th>Progress</th>
+                            <th>Gold</th>
+                            <th>PVP Points</th>
+                            <th>Completed</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in completedRuns)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div style="
+                                            width: 32px; height: 32px;
+                                            border-radius: var(--atlas-radius-sm);
+                                            background: var(--atlas-primary-subtle);
+                                            border: 1px solid rgba(45,127,249,0.12);
+                                            display: flex; align-items: center; justify-content: center;
+                                            font-size: 0.9rem;
+                                                ">
+                                            ⚔️
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 600; color: var(--atlas-text-primary); font-size: 0.9rem;">
+                                                @run.Race @run.Class
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="atlas-badge atlas-badge--level">Lv. @run.CurrentLevel</span>
+                                </td>
+                                <td>
+                                    <div style="min-width: 120px;">
+                                        <div class="atlas-progress" style="height: 6px;">
+                                            <div class="atlas-progress__bar"
+                                                 style="width: @((run.CurrentTurn / 20.0 * 100))%"></div>
+                                        </div>
+                                        <span style="font-size: 0.75rem; color: var(--atlas-text-muted);">
+                                            @run.CurrentTurn/20 turns
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span style="color: var(--atlas-gold-light); font-weight: 600; font-family: var(--atlas-font-mono);">
+                                        @run.Gold
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="font-family: var(--atlas-font-mono);">@run.PvpPoints</span>
+                                </td>
+                                <td>
+                                    <span style="font-size: 0.85rem; color: var(--atlas-text-muted);">
+                                        @run.CompletedAt?.ToString("MMM dd, HH:mm")
+                                    </span>
+                                </td>
+                                <td>
+                                    <a asp-controller="Run" asp-action="Summary" asp-route-id="@run.Id"
+                                       class="atlas-btn atlas-btn--ghost atlas-btn--sm">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else if (activeRun == null)
+{
+    <div class="atlas-card atlas-fade-in atlas-fade-in-delay-5">
+        <div class="atlas-card__body">
+            <div class="atlas-section-header atlas-mb-lg">
+                <div class="atlas-section-header__icon">
+                    <i class="bi bi-compass"></i>
+                </div>
+                <div class="atlas-section-header__text">
+                    <h4>Getting Started</h4>
+                    <p>Here's how to begin your adventure</p>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="d-flex gap-3">
+                        <div style="
+                            width: 40px; height: 40px; flex-shrink: 0;
+                            border-radius: var(--atlas-radius-full);
+                            background: linear-gradient(135deg, var(--atlas-primary), var(--atlas-indigo));
+                            display: flex; align-items: center; justify-content: center;
+                            font-weight: 700; font-size: 0.9rem; color: white;
+                            ">
+                            1
+                        </div>
+                        <div>
+                            <h6 style="font-family: var(--atlas-font-display); margin-bottom: 0.25rem;">Choose Your Path</h6>
+                            <p style="font-size: 0.85rem; color: var(--atlas-text-muted); margin: 0;">
+                                Select from 5 unique races and 5 powerful classes.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex gap-3">
+                        <div style="
+                            width: 40px; height: 40px; flex-shrink: 0;
+                            border-radius: var(--atlas-radius-full);
+                            background: linear-gradient(135deg, var(--atlas-primary), var(--atlas-indigo));
+                            display: flex; align-items: center; justify-content: center;
+                            font-weight: 700; font-size: 0.9rem; color: white;
+                            ">
+                            2
+                        </div>
+                        <div>
+                            <h6 style="font-family: var(--atlas-font-display); margin-bottom: 0.25rem;">Battle & Loot</h6>
+                            <p style="font-size: 0.85rem; color: var(--atlas-text-muted); margin: 0;">
+                                Fight PVE monsters and PVP opponents across 20 turns.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex gap-3">
+                        <div style="
+                            width: 40px; height: 40px; flex-shrink: 0;
+                            border-radius: var(--atlas-radius-full);
+                            background: linear-gradient(135deg, var(--atlas-primary), var(--atlas-indigo));
+                            display: flex; align-items: center; justify-content: center;
+                            font-weight: 700; font-size: 0.9rem; color: white;
+                            ">
+                            3
+                        </div>
+                        <div>
+                            <h6 style="font-family: var(--atlas-font-display); margin-bottom: 0.25rem;">Climb the Ladder</h6>
+                            <p style="font-size: 0.85rem; color: var(--atlas-text-muted); margin: 0;">
+                                Earn PVP points and compete on the global leaderboard.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

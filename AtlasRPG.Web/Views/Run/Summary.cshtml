@@ -1,0 +1,542 @@
+﻿@* AtlasRPG.Web/Views/Run/Summary.cshtml *@
+@model AtlasRPG.Core.Entities.Runs.Run
+@{
+    ViewData["Title"] = "Run Summary";
+    bool didComplete = (bool)(ViewBag.DidComplete ?? false);
+    int pvpWins = (int)(ViewBag.PvpWins ?? 0);
+    int pvpLosses = (int)(ViewBag.PvpLosses ?? 0);
+    int pveWins = (int)(ViewBag.PveWins ?? 0);
+    int pveLosses = (int)(ViewBag.PveLosses ?? 0);
+}
+
+<style>
+    body {
+        background: #0f0f1a;
+        color: #e0e0e0;
+    }
+
+    .summary-hero {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        text-align: center;
+        border: 1px solid #2a2a4a;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .summary-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, rgba(100,150,255,0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+    .result-badge {
+        display: inline-block;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        padding: 0.35rem 1.2rem;
+        border-radius: 999px;
+        margin-bottom: 1rem;
+    }
+
+    .badge-complete {
+        background: #ffd70022;
+        color: #ffd700;
+        border: 1px solid #ffd70055;
+    }
+
+    .badge-failed {
+        background: #ff444422;
+        color: #ff6666;
+        border: 1px solid #ff444455;
+    }
+
+    .hero-title {
+        font-size: 3rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        margin-bottom: 0.5rem;
+    }
+
+    .hero-sub {
+        color: #9090b0;
+        font-size: 1.1rem;
+    }
+
+    /* Stat Cards */
+    .stat-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .stat-grid-2 {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .stat-grid-3 {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .stat-grid-4 {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .stat-card {
+        background: #1a1a2e;
+        border: 1px solid #2a2a4a;
+        border-radius: 12px;
+        padding: 1.25rem 1rem;
+        text-align: center;
+        transition: border-color .2s, transform .2s;
+    }
+
+        .stat-card:hover {
+            border-color: #4455aa;
+            transform: translateY(-2px);
+        }
+
+    .stat-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #6060a0;
+        margin-bottom: 0.4rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 0.2rem;
+    }
+
+    .stat-sub {
+        font-size: 0.75rem;
+        color: #6060a0;
+    }
+
+    .stat-value.gold {
+        color: #ffd700;
+    }
+
+    .stat-value.win {
+        color: #4caf50;
+    }
+
+    .stat-value.loss {
+        color: #f44336;
+    }
+
+    .stat-value.blue {
+        color: #4fc3f7;
+    }
+
+    .stat-value.purple {
+        color: #ce93d8;
+    }
+
+    .stat-value.orange {
+        color: #ffb74d;
+    }
+
+    /* Section headers */
+    .section-title {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        color: #5050a0;
+        margin: 2rem 0 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #2a2a4a;
+        }
+
+    /* Build card */
+    .build-card {
+        background: #1a1a2e;
+        border: 1px solid #2a2a4a;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .build-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #1e1e35;
+    }
+
+        .build-row:last-child {
+            border-bottom: none;
+        }
+
+    .build-key {
+        color: #6060a0;
+        font-size: 0.85rem;
+    }
+
+    .build-val {
+        font-weight: 700;
+        font-size: 0.95rem;
+    }
+
+    .build-count {
+        font-size: 0.75rem;
+        color: #404070;
+        margin-left: .5rem;
+    }
+
+    /* Turn timeline */
+    .timeline {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin: .5rem 0;
+    }
+
+    .t-dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        font-weight: 700;
+        cursor: default;
+    }
+
+    .t-pvp-win {
+        background: #1e3a2e;
+        color: #4caf50;
+        border: 1px solid #4caf5055;
+    }
+
+    .t-pvp-loss {
+        background: #3a1e1e;
+        color: #f44336;
+        border: 1px solid #f4433655;
+    }
+
+    .t-pve-win {
+        background: #1e2e3a;
+        color: #4fc3f7;
+        border: 1px solid #4fc3f755;
+    }
+
+    .t-pve-loss {
+        background: #2e1e3a;
+        color: #ce93d8;
+        border: 1px solid #ce93d855;
+    }
+
+    .t-empty {
+        background: #151525;
+        color: #303050;
+        border: 1px dashed #303050;
+    }
+
+    /* Action buttons */
+    .action-row {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 2.5rem;
+    }
+
+    .btn-atlas-primary {
+        background: linear-gradient(135deg, #3a3a8a, #2a2a6a);
+        color: #fff;
+        border: 1px solid #5555cc;
+        padding: 0.9rem 2.5rem;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+        text-decoration: none;
+        transition: all .2s;
+    }
+
+        .btn-atlas-primary:hover {
+            background: linear-gradient(135deg, #4a4aaa, #3a3a7a);
+            border-color: #7777dd;
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+    .btn-atlas-ghost {
+        background: transparent;
+        color: #8080b0;
+        border: 1px solid #2a2a4a;
+        padding: 0.9rem 2rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all .2s;
+    }
+
+        .btn-atlas-ghost:hover {
+            border-color: #4040a0;
+            color: #a0a0d0;
+            transform: translateY(-1px);
+        }
+
+    @@media (max-width: 768px) {
+        .stat-grid-3, .stat-grid-4 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .hero-title {
+            font-size: 2rem;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .stat-grid-2, .stat-grid-3, .stat-grid-4 {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="container py-5" style="max-width: 900px;">
+
+    <!-- ── HERO ─────────────────────────────────────────────── -->
+    <div class="summary-hero mb-4">
+        @if (didComplete)
+        {
+            <div class="result-badge badge-complete">✦ Run Complete ✦</div>
+            <div class="hero-title">🏆 @Model.Race @Model.Class</div>
+            <p class="hero-sub">Survived all 20 turns — Level @ViewBag.FinalLevel • @ViewBag.TotalGold Gold</p>
+        }
+        else
+        {
+            <div class="result-badge badge-failed">✗ Run Ended</div>
+            <div class="hero-title">💀 @Model.Race @Model.Class</div>
+            <p class="hero-sub">Fell at Turn @Model.CurrentTurn — Level @ViewBag.FinalLevel • @ViewBag.TotalGold Gold</p>
+        }
+
+        <!-- Quick stat pills -->
+        <div class="d-flex justify-content-center gap-3 mt-3 flex-wrap">
+            <span class="badge fs-6 px-3 py-2" style="background:#1a2a1a;color:#4caf50;border:1px solid #4caf5033;">
+                ⚔ @ViewBag.PvpWinRate% PVP Win Rate
+            </span>
+            <span class="badge fs-6 px-3 py-2" style="background:#1a1a2e;color:#ffd700;border:1px solid #ffd70033;">
+                🪙 @ViewBag.TotalGold Gold Earned
+            </span>
+            <span class="badge fs-6 px-3 py-2" style="background:#2a1a2e;color:#ce93d8;border:1px solid #ce93d833;">
+                💎 @ViewBag.PvpPoints PVP Points
+            </span>
+        </div>
+    </div>
+
+    <!-- ── WIN / LOSS ────────────────────────────────────────── -->
+    <div class="section-title">⚔ Combat Record</div>
+    <div class="stat-grid stat-grid-4">
+        <div class="stat-card">
+            <div class="stat-label">PVP Wins</div>
+            <div class="stat-value win">@pvpWins</div>
+            <div class="stat-sub">of @(pvpWins + pvpLosses) PVP turns</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">PVP Losses</div>
+            <div class="stat-value loss">@pvpLosses</div>
+            <div class="stat-sub">@ViewBag.PvpWinRate% win rate</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">PVE Wins</div>
+            <div class="stat-value blue">@pveWins</div>
+            <div class="stat-sub">of @(pveWins + pveLosses) PVE turns</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">PVE Losses</div>
+            <div class="stat-value" style="color:#9090b0;">@pveLosses</div>
+            <div class="stat-sub">encounters</div>
+        </div>
+    </div>
+
+    <!-- ── COMBAT STATS ──────────────────────────────────────── -->
+    <div class="section-title">📊 Battle Stats</div>
+    <div class="stat-grid stat-grid-3">
+        <div class="stat-card">
+            <div class="stat-label">Damage Dealt</div>
+            <div class="stat-value orange">@ViewBag.TotalDmgDealt</div>
+            <div class="stat-sub">across all turns</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Damage Taken</div>
+            <div class="stat-value" style="color:#e57373;">@ViewBag.TotalDmgTaken</div>
+            <div class="stat-sub">across all turns</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Critical Hits</div>
+            <div class="stat-value gold">@ViewBag.TotalCrits</div>
+            <div class="stat-sub">total crits landed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg Rounds</div>
+            <div class="stat-value blue">@ViewBag.AvgRounds</div>
+            <div class="stat-sub">per combat</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Sudden Death</div>
+            <div class="stat-value @(ViewBag.SuddenDeathCount > 0 ? "orange" : "")">@ViewBag.SuddenDeathCount</div>
+            <div class="stat-sub">@ViewBag.SuddenDeathRate% of fights</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Turns Played</div>
+            <div class="stat-value purple">@ViewBag.CompletedTurnCount</div>
+            <div class="stat-sub">of 20 total turns</div>
+        </div>
+    </div>
+
+    <!-- ── BUILD SUMMARY ────────────────────────────────────── -->
+    <div class="section-title">🔧 Build Profile</div>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="build-card h-100">
+                <div class="build-row">
+                    <span class="build-key">Main Weapon</span>
+                    <span class="build-val">
+                        @{
+                            string wep = ViewBag.MostUsedWeapon?.ToString() ?? "—";
+                            string wepEmoji = wep switch
+                            {
+                                "Bow" => "🏹",
+                                "Dagger" => "🗡️",
+                                "1HSword" => "⚔️",
+                                "2HSword" => "🗡️",
+                                "Wand" => "🪄",
+                                "Staff" => "🔮",
+                                _ => "❓"
+                            };
+                        }
+                        @wepEmoji @wep
+                        <span class="build-count">(@ViewBag.MostUsedWeaponCount turns)</span>
+                    </span>
+                </div>
+                <div class="build-row">
+                    <span class="build-key">Main Skill</span>
+                    <span class="build-val">
+                        @ViewBag.MostUsedSkill
+                        <span class="build-count">(@ViewBag.MostUsedSkillCount turns)</span>
+                    </span>
+                </div>
+                <div class="build-row">
+                    <span class="build-key">Final Level</span>
+                    <span class="build-val" style="color:#ffd700;">Lv @ViewBag.FinalLevel</span>
+                </div>
+                <div class="build-row">
+                    <span class="build-key">PVP Points</span>
+                    <span class="build-val" style="color:#ce93d8;">@ViewBag.PvpPoints</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="build-card h-100">
+                <div class="build-row">
+                    <span class="build-key">Passive Nodes</span>
+                    <span class="build-val" style="color:#4fc3f7;">@ViewBag.AllocatedNodeCount / 19</span>
+                </div>
+                <div class="build-row">
+                    <span class="build-key">Keystone</span>
+                    <span class="build-val">
+                        @if (ViewBag.KeystoneNode?.ToString() != "None")
+                        {
+                            <span style="color:#ffd700;">⭐ @ViewBag.KeystoneNode</span>
+                        }
+                        else
+                        {
+                            <span style="color:#404060;">None</span>
+                        }
+                    </span>
+                </div>
+                <div class="build-row">
+                    <span class="build-key">Wound Status</span>
+                    <span class="build-val">
+                        @if (Model.HasWoundDebuff)
+                        {
+                            <span style="color:#f44336;">🩸 Active</span>
+                        }
+                        else
+                        {
+                            <span style="color:#4caf50;">✓ Clear</span>
+                        }
+                    </span>
+                </div>
+                <div class="build-row">
+                    <span class="build-key">Total Gold</span>
+                    <span class="build-val gold">🪙 @ViewBag.TotalGold</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TURN TIMELINE ────────────────────────────────────── -->
+    <div class="section-title">📅 Turn Timeline</div>
+    <div class="build-card">
+        <div class="timeline">
+            @{
+                var turnList = Model.Turns.OrderBy(t => t.TurnNumber).ToList();
+            }
+            @for (int i = 1; i <= 20; i++)
+            {
+                var t = turnList.FirstOrDefault(x => x.TurnNumber == i);
+                if (t == null)
+                {
+                    <div class="t-dot t-empty" title="Turn @i — Not Reached">@i</div>
+                }
+                else if (t.IsPvp && t.IsVictory == true)
+                {
+                    <div class="t-dot t-pvp-win" title="Turn @i — PVP Win (+@t.GoldEarned g)">@i</div>
+                }
+                else if (t.IsPvp && t.IsVictory == false)
+                {
+                    <div class="t-dot t-pvp-loss" title="Turn @i — PVP Loss (+@t.GoldEarned g)">@i</div>
+                }
+                else if (!t.IsPvp && t.IsVictory == true)
+                {
+                    <div class="t-dot t-pve-win" title="Turn @i — PVE Win (+@t.GoldEarned g)">@i</div>
+                }
+                else
+                {
+                    <div class="t-dot t-pve-loss" title="Turn @i — PVE Loss">@i</div>
+                }
+            }
+        </div>
+        <!-- Legend -->
+        <div class="d-flex gap-3 mt-2 flex-wrap" style="font-size:0.72rem;color:#5060a0;">
+            <span>🟢 PVP Win</span>
+            <span style="color:#f44336;">🔴 PVP Loss</span>
+            <span style="color:#4fc3f7;">🔵 PVE Win</span>
+            <span style="color:#ce93d8;">🟣 PVE Loss</span>
+            <span style="color:#303050;">⚫ Not Reached</span>
+        </div>
+    </div>
+
+    <!-- ── ACTIONS ───────────────────────────────────────────── -->
+    <div class="action-row">
+        <a asp-action="Create" asp-controller="Run" class="btn-atlas-primary">
+            🎮 Start New Run
+        </a>
+        <a asp-controller="Game" asp-action="Dashboard" class="btn-atlas-ghost">
+            🏠 Dashboard
+        </a>
+    </div>
+
+</div>

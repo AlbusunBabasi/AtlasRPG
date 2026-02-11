@@ -1,0 +1,230 @@
+﻿<!-- AtlasRPG.Web/Views/Account/Register.cshtml -->
+@model AtlasRPG.Web.Models.Account.RegisterViewModel
+@{
+    ViewData["Title"] = "Register";
+}
+
+<div class="atlas-auth">
+    <div class="atlas-auth__container">
+
+        <!-- Header -->
+        <div class="atlas-auth__header">
+            <div class="atlas-auth__icon" style="background: rgba(0,210,255,0.08); border-color: rgba(0,210,255,0.12);">
+                <i class="bi bi-person-plus" style="color: var(--atlas-accent);"></i>
+            </div>
+            <h1 class="atlas-auth__title">
+                Forge Your <span class="atlas-text-gradient">Legend</span>
+            </h1>
+            <p class="atlas-auth__subtitle">
+                Create your account and enter the arena
+            </p>
+        </div>
+
+        <!-- Card -->
+        <div class="atlas-auth__card">
+            <div class="atlas-auth__card-body">
+
+                <form asp-action="Register" method="post" novalidate>
+
+                    <!-- Validation Summary -->
+                    <div asp-validation-summary="All" class="atlas-validation-summary"></div>
+
+                    <!-- Username -->
+                    <div class="atlas-form-group">
+                        <label asp-for="Username" class="atlas-form-label">Username</label>
+                        <div class="atlas-input-wrapper">
+                            <i class="bi bi-person atlas-input-icon"></i>
+                            <input asp-for="Username"
+                                   class="atlas-input"
+                                   placeholder="Choose a unique username"
+                                   autocomplete="username"
+                                   autofocus />
+                        </div>
+                        <span asp-validation-for="Username" class="atlas-form-error"></span>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="atlas-form-group">
+                        <label asp-for="Email" class="atlas-form-label">Email</label>
+                        <div class="atlas-input-wrapper">
+                            <i class="bi bi-envelope atlas-input-icon"></i>
+                            <input asp-for="Email"
+                                   class="atlas-input"
+                                   type="email"
+                                   placeholder="your@email.com"
+                                   autocomplete="email" />
+                        </div>
+                        <span asp-validation-for="Email" class="atlas-form-error"></span>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="atlas-form-group">
+                        <label asp-for="Password" class="atlas-form-label">Password</label>
+                        <div class="atlas-input-wrapper atlas-input-wrapper--has-action">
+                            <i class="bi bi-lock atlas-input-icon"></i>
+                            <input asp-for="Password"
+                                   class="atlas-input"
+                                   type="password"
+                                   placeholder="Create a strong password"
+                                   autocomplete="new-password"
+                                   id="registerPassword"
+                                   oninput="updatePasswordStrength(this.value)" />
+                            <button type="button"
+                                    class="atlas-input-action"
+                                    onclick="togglePassword('registerPassword', this)"
+                                    aria-label="Toggle password visibility">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Password" class="atlas-form-error"></span>
+
+                        <!-- Password Strength -->
+                        <div class="atlas-password-strength" id="passwordStrength" style="display: none;">
+                            <div class="atlas-password-strength__bar">
+                                <div class="atlas-password-strength__fill" id="strengthFill"></div>
+                            </div>
+                            <span class="atlas-password-strength__text" id="strengthText"></span>
+                        </div>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="atlas-form-group">
+                        <label asp-for="ConfirmPassword" class="atlas-form-label">Confirm Password</label>
+                        <div class="atlas-input-wrapper atlas-input-wrapper--has-action">
+                            <i class="bi bi-lock-fill atlas-input-icon"></i>
+                            <input asp-for="ConfirmPassword"
+                                   class="atlas-input"
+                                   type="password"
+                                   placeholder="Repeat your password"
+                                   autocomplete="new-password"
+                                   id="confirmPassword" />
+                            <button type="button"
+                                    class="atlas-input-action"
+                                    onclick="togglePassword('confirmPassword', this)"
+                                    aria-label="Toggle password visibility">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="ConfirmPassword" class="atlas-form-error"></span>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="atlas-btn atlas-btn--primary atlas-btn--lg atlas-btn--block">
+                        <i class="bi bi-lightning-charge-fill"></i>
+                        Create Account
+                    </button>
+
+                </form>
+
+                <!-- Divider -->
+                <div class="atlas-divider-text">
+                    <span>or</span>
+                </div>
+
+                <!-- Footer Link -->
+                <div class="atlas-auth__footer" style="border: none; padding-top: 0; margin-top: 0;">
+                    <p>
+                        Already have an account?
+                        <a asp-action="Login">Sign in here</a>
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Features below form -->
+        <div class="atlas-auth-features atlas-mt-2xl">
+            <div class="atlas-auth-feature atlas-fade-in atlas-fade-in-delay-1">
+                <div class="atlas-auth-feature__icon">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <div class="atlas-auth-feature__text">
+                    <h6>Secure & Private</h6>
+                    <p>Your data is encrypted and never shared with third parties.</p>
+                </div>
+            </div>
+            <div class="atlas-auth-feature atlas-fade-in atlas-fade-in-delay-2">
+                <div class="atlas-auth-feature__icon"
+                     style="background: rgba(0,210,255,0.08); border-color: rgba(0,210,255,0.12);">
+                    <i class="bi bi-controller" style="color: var(--atlas-accent);"></i>
+                </div>
+                <div class="atlas-auth-feature__text">
+                    <h6>Play Instantly</h6>
+                    <p>No downloads required — start your first run immediately after signup.</p>
+                </div>
+            </div>
+            <div class="atlas-auth-feature atlas-fade-in atlas-fade-in-delay-3">
+                <div class="atlas-auth-feature__icon"
+                     style="background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.12);">
+                    <i class="bi bi-people" style="color: var(--atlas-indigo-light);"></i>
+                </div>
+                <div class="atlas-auth-feature__text">
+                    <h6>Growing Community</h6>
+                    <p>Join a thriving community of strategists and arena champions.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Password visibility toggle
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        }
+
+        // Password strength checker
+        function updatePasswordStrength(password) {
+            const container = document.getElementById('passwordStrength');
+            const fill = document.getElementById('strengthFill');
+            const text = document.getElementById('strengthText');
+
+            if (!password) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            let score = 0;
+
+            if (password.length >= 6) score++;
+            if (password.length >= 10) score++;
+            if (/[A-Z]/.test(password)) score++;
+            if (/[0-9]/.test(password)) score++;
+            if (/[^A-Za-z0-9]/.test(password)) score++;
+
+            // Remove all level classes
+            fill.className = 'atlas-password-strength__fill';
+            text.className = 'atlas-password-strength__text';
+
+            if (score <= 1) {
+                fill.classList.add('atlas-password-strength__fill--weak');
+                text.classList.add('atlas-password-strength__text--weak');
+                text.textContent = 'Weak';
+            } else if (score <= 2) {
+                fill.classList.add('atlas-password-strength__fill--fair');
+                text.classList.add('atlas-password-strength__text--fair');
+                text.textContent = 'Fair';
+            } else if (score <= 3) {
+                fill.classList.add('atlas-password-strength__fill--good');
+                text.classList.add('atlas-password-strength__text--good');
+                text.textContent = 'Good';
+            } else {
+                fill.classList.add('atlas-password-strength__fill--strong');
+                text.classList.add('atlas-password-strength__text--strong');
+                text.textContent = 'Strong';
+            }
+        }
+    </script>
+}

@@ -1,0 +1,152 @@
+﻿<!-- AtlasRPG.Web/Views/Account/Login.cshtml -->
+@model AtlasRPG.Web.Models.Account.LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="atlas-auth">
+    <div class="atlas-auth__container">
+
+        <!-- Header -->
+        <div class="atlas-auth__header">
+            <div class="atlas-auth__icon">
+                <i class="bi bi-shield-lock"></i>
+            </div>
+            <h1 class="atlas-auth__title">
+                Welcome <span class="atlas-text-gradient">Back</span>
+            </h1>
+            <p class="atlas-auth__subtitle">
+                Sign in to continue your adventure
+            </p>
+        </div>
+
+        <!-- Card -->
+        <div class="atlas-auth__card">
+            <div class="atlas-auth__card-body">
+
+                <form asp-action="Login" method="post" novalidate>
+
+                    <!-- Validation Summary -->
+                    <div asp-validation-summary="All" class="atlas-validation-summary"></div>
+
+                    <!-- Username -->
+                    <div class="atlas-form-group">
+                        <label asp-for="Username" class="atlas-form-label">Username</label>
+                        <div class="atlas-input-wrapper">
+                            <i class="bi bi-person atlas-input-icon"></i>
+                            <input asp-for="Username"
+                                   class="atlas-input"
+                                   placeholder="Enter your username"
+                                   autocomplete="username"
+                                   autofocus />
+                        </div>
+                        <span asp-validation-for="Username" class="atlas-form-error"></span>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="atlas-form-group">
+                        <label asp-for="Password" class="atlas-form-label">Password</label>
+                        <div class="atlas-input-wrapper atlas-input-wrapper--has-action">
+                            <i class="bi bi-lock atlas-input-icon"></i>
+                            <input asp-for="Password"
+                                   class="atlas-input"
+                                   type="password"
+                                   placeholder="Enter your password"
+                                   autocomplete="current-password"
+                                   id="loginPassword" />
+                            <button type="button"
+                                    class="atlas-input-action"
+                                    onclick="togglePassword('loginPassword', this)"
+                                    aria-label="Toggle password visibility">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Password" class="atlas-form-error"></span>
+                    </div>
+
+                    <!-- Remember Me -->
+                    <div class="atlas-form-group">
+                        <label class="atlas-checkbox">
+                            <input asp-for="RememberMe"
+                                   class="atlas-checkbox__input"
+                                   type="checkbox" />
+                            <span class="atlas-checkbox__label">Remember me on this device</span>
+                        </label>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="atlas-btn atlas-btn--primary atlas-btn--lg atlas-btn--block">
+                        <i class="bi bi-box-arrow-in-right"></i>
+                        Sign In
+                    </button>
+
+                </form>
+
+                <!-- Divider -->
+                <div class="atlas-divider-text">
+                    <span>or</span>
+                </div>
+
+                <!-- Footer Link -->
+                <div class="atlas-auth__footer" style="border: none; padding-top: 0; margin-top: 0;">
+                    <p>
+                        Don't have an account?
+                        <a asp-action="Register">Create one now</a>
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Features below form -->
+        <div class="atlas-auth-features atlas-mt-2xl">
+            <div class="atlas-auth-feature atlas-fade-in atlas-fade-in-delay-1">
+                <div class="atlas-auth-feature__icon">
+                    <i class="bi bi-lightning-charge"></i>
+                </div>
+                <div class="atlas-auth-feature__text">
+                    <h6>Instant Action</h6>
+                    <p>Jump straight into runs — no waiting, pure gameplay.</p>
+                </div>
+            </div>
+            <div class="atlas-auth-feature atlas-fade-in atlas-fade-in-delay-2">
+                <div class="atlas-auth-feature__icon"
+                     style="background: rgba(0,210,255,0.08); border-color: rgba(0,210,255,0.12);">
+                    <i class="bi bi-trophy" style="color: var(--atlas-accent);"></i>
+                </div>
+                <div class="atlas-auth-feature__text">
+                    <h6>Climb the Ladder</h6>
+                    <p>Compete against real players on the global leaderboard.</p>
+                </div>
+            </div>
+            <div class="atlas-auth-feature atlas-fade-in atlas-fade-in-delay-3">
+                <div class="atlas-auth-feature__icon"
+                     style="background: rgba(245,166,35,0.08); border-color: rgba(245,166,35,0.12);">
+                    <i class="bi bi-gem" style="color: var(--atlas-gold);"></i>
+                </div>
+                <div class="atlas-auth-feature__text">
+                    <h6>Legendary Loot</h6>
+                    <p>Discover rare items with unique affixes and powerful combinations.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        }
+    </script>
+}
