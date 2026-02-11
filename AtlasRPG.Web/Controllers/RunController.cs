@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Web/Controllers/RunController.cs
+// AtlasRPG.Web/Controllers/RunController.cs
 using System.Security.Claims;
 using AtlasRPG.Application.Services;
 using AtlasRPG.Core.Entities.GameData;
@@ -220,13 +220,15 @@ namespace AtlasRPG.Web.Controllers
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             var combatResult = await _context.CombatResults
-                .Include(c => c.Rounds.OrderBy(r => r.RoundNumber))
+                .Include(c => c.Rounds)
                 .Include(c => c.RunTurn)
                     .ThenInclude(t => t.Run)
                 .FirstOrDefaultAsync(c => c.Id == id && c.RunTurn.Run.UserId == userId);
 
-            if (combatResult == null)
-                return NotFound();
+            if (combatResult == null) return NotFound();
+
+            var sortedRounds = combatResult.Rounds.OrderBy(r => r.RoundNumber).ToList();
+            combatResult.Rounds = sortedRounds;
 
             ViewBag.RunIsActive = combatResult.RunTurn.Run.IsActive;
             ViewBag.RunId = combatResult.RunTurn.Run.Id;
@@ -248,15 +250,19 @@ namespace AtlasRPG.Web.Controllers
                     .Select(g => g!.Value)
                     .ToList();
 
-                var runItems = await _context.RunItems
-                    .Include(ri => ri.Item)
-                        .ThenInclude(i => i.Affixes)
-                        .ThenInclude(a => a.AffixDefinition)
-                    .Where(ri => ids.Contains(ri.Id))
-                    .ToListAsync();
+                var runItems = new List<RunItem>();
+                foreach (var runItemId in ids)
+                {
+                    var ri = await _context.RunItems
+                        .Include(ri => ri.Item)
+                            .ThenInclude(i => i.Affixes)
+                            .ThenInclude(a => a.AffixDefinition)
+                        .FirstOrDefaultAsync(ri => ri.Id == runItemId);
+                    if (ri != null) runItems.Add(ri);
+                }
 
                 lootResult.Items = runItems
-                    .Select(AtlasRPG.Application.Services.LootItemDto.FromRunItem)
+                    .Select(LootItemDto.FromRunItem)
                     .ToList();
             }
 
@@ -403,10 +409,14 @@ namespace AtlasRPG.Web.Controllers
             string? keystoneNodeId = null;
             if (allocatedNodeIds.Any())
             {
-                var keystone = await _context.PassiveNodeDefinitions
-                    .Where(nd => allocatedNodeIds.Contains(nd.NodeId) && nd.NodeType == "Keystone")
-                    .FirstOrDefaultAsync();
-                keystoneNodeId = keystone?.DisplayName;
+                var allKeystones = await _context.PassiveNodeDefinitions
+                    .Where(nd => nd.NodeType == "Keystone")
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                keystoneNodeId = allKeystones
+                    .FirstOrDefault(nd => allocatedNodeIds.Contains(nd.NodeId))
+                    ?.DisplayName;
             }
 
             // ── Run tamamlanma durumu ───────────────────────────────
@@ -591,8 +601,10 @@ namespace AtlasRPG.Web.Controllers
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
+            // ✅ AsNoTracking — validation için yükle, track etme
             var run = await _context.Runs
                 .Include(r => r.AllocatedPassives)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Id == runId && r.UserId == userId && r.IsActive);
 
             if (run == null) return NotFound();
@@ -612,6 +624,7 @@ namespace AtlasRPG.Web.Controllers
             }
 
             var nodeDef = await _context.PassiveNodeDefinitions
+                .AsNoTracking()
                 .FirstOrDefaultAsync(n => n.NodeId == nodeId);
 
             if (nodeDef == null) return NotFound();
@@ -624,7 +637,8 @@ namespace AtlasRPG.Web.Controllers
             }
 
             // Guard: prerequisite karşılandı mı?
-            if (!string.IsNullOrWhiteSpace(nodeDef.PrerequisiteNodeIds))
+            var allocatedIds = run.AllocatedPassives.Select(p => p.NodeId).ToHashSet();
+            if (!string.IsNullOrEmpty(nodeDef.PrerequisiteNodeIds))
             {
                 var prereqs = nodeDef.PrerequisiteNodeIds
                     .Split(',')
@@ -632,42 +646,29 @@ namespace AtlasRPG.Web.Controllers
                     .Where(x => !string.IsNullOrEmpty(x))
                     .ToList();
 
-                var allocatedIds = run.AllocatedPassives.Select(p => p.NodeId).ToHashSet();
-                bool prereqMet = prereqs.All(p => allocatedIds.Contains(p));
-
-                if (!prereqMet)
+                if (prereqs.Any() && !prereqs.Any(p => allocatedIds.Contains(p)))
                 {
-                    TempData["Error"] = $"Prerequisites not met: {string.Join(", ", prereqs)}";
+                    TempData["Error"] = "Prerequisites not met";
                     return RedirectToAction("PassiveTree", new { id = runId });
                 }
             }
 
-            // Guard: keystone limiti (max 1)
-            if (nodeDef.NodeType == "Keystone")
+            // ✅ DÜZELTME: RunPassiveNode'u doğrudan DbSet üzerinden ekle (navigation property bypass)
+            _context.RunPassiveNodes.Add(new RunPassiveNode
             {
-                var keystoneIds = await _context.PassiveNodeDefinitions
-                    .Where(nd => nd.NodeType == "Keystone")
-                    .Select(nd => nd.NodeId)
-                    .ToListAsync();
-
-                bool hasKeystone = run.AllocatedPassives.Any(p => keystoneIds.Contains(p.NodeId));
-                if (hasKeystone)
-                {
-                    TempData["Error"] = "You can only allocate one Keystone node per run.";
-                    return RedirectToAction("PassiveTree", new { id = runId });
-                }
-            }
-
-            // Allocate
-            run.AllocatedPassives.Add(new RunPassiveNode
-            {
-                RunId = run.Id,
+                RunId = runId,
                 NodeId = nodeId,
                 AllocatedAtLevel = run.CurrentLevel
             });
-            run.AvailableSkillPoints--;
 
-            await _context.SaveChangesAsync();
+            // ✅ DÜZELTME: AvailableSkillPoints için ExecuteUpdate — doğrudan SQL UPDATE,
+            // EF Change Tracker'ı tamamen bypass eder, 0-row problemi olmaz
+            await _context.Runs
+                .Where(r => r.Id == runId && r.AvailableSkillPoints > 0)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.AvailableSkillPoints, r => r.AvailableSkillPoints - 1));
+
+            await _context.SaveChangesAsync(); // sadece RunPassiveNode INSERT'i
 
             TempData["Success"] = $"✅ Allocated: {nodeDef.DisplayName}";
             return RedirectToAction("PassiveTree", new { id = runId });
