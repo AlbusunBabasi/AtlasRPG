@@ -33,7 +33,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Identity configuration
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    // Password settings (development - gevþek, production'da sýkýlaþtýr)
+    // Password settings (development - gevÅŸek, production'da sÄ±kÄ±laÅŸtÄ±r)
     options.Password.RequireDigit = false;
     options.Password.RequireLowercase = false;
     options.Password.RequireUppercase = false;
