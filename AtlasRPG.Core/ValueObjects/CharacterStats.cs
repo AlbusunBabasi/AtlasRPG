@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Core/ValueObjects/CharacterStats.cs
+// AtlasRPG.Core/ValueObjects/CharacterStats.cs
 namespace AtlasRPG.Core.ValueObjects
 {
     public class CharacterStats
@@ -56,5 +56,7 @@ namespace AtlasRPG.Core.ValueObjects
         public decimal ArmorPenetration { get; set; } = 0m;
 
         public PassiveBonuses PassiveBonuses { get; set; } = new();
+        public List<ActiveStatusEffect> StatusEffects { get; set; } = new();
+        public bool IsStunned { get; set; } = false;
     }
 }
