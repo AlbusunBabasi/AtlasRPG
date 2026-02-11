@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,7 +14,7 @@ namespace AtlasRPG.Core.Entities.GameData
         public string SkillId { get; set; } = string.Empty; // "QuickSlash", "BackStab"
         public string DisplayName { get; set; } = string.Empty;
         public WeaponType WeaponType { get; set; }
-        //public EffectType EffectType { get; set; }
+
 
         public decimal Multiplier { get; set; }
         public int ManaCost { get; set; }
