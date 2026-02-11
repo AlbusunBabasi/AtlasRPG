@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Application/Services/ItemGenerationService.cs
+// AtlasRPG.Application/Services/ItemGenerationService.cs
 using AtlasRPG.Core.Entities.Items;
 using AtlasRPG.Core.Enums;
 using AtlasRPG.Infrastructure.Data;
@@ -72,10 +72,8 @@ namespace AtlasRPG.Application.Services
 
         public async Task GenerateAffixes(Item item, ItemRarity rarity, int itemLevel)
         {
-            // Mevcut affix sayısı
             int currentAffixCount = item.Affixes.Count;
 
-            // Hedef affix sayısı
             int targetAffixCount = rarity switch
             {
                 ItemRarity.Normal => 1,
@@ -84,32 +82,27 @@ namespace AtlasRPG.Application.Services
                 _ => 1
             };
 
-            // Eğer upgrade ise, sadece eksik affixleri ekle
             int affixesToAdd = targetAffixCount - currentAffixCount;
 
             if (affixesToAdd <= 0)
             {
-                // Reroll durumu: hepsini sil ve yeniden oluştur
                 if (currentAffixCount > 0)
-                {
                     affixesToAdd = targetAffixCount;
-                }
                 else
-                {
-                    return; // Zaten dolu
-                }
+                    return;
             }
 
-            // Get available affixes for this slot
             var slotName = item.Slot.ToString();
+
+            // ✅ DÜZELTME: Contains() yerine EF.Functions.Like() kullan
+            // EF Core 7+ string.Contains() -> COLLATE clause üretir, SQL Server'da hata verir
             var availableAffixes = await _context.AffixDefinitions
-                .Where(a => a.AllowedSlots.Contains(slotName))
+                .Where(a => EF.Functions.Like(a.AllowedSlots, $"%{slotName}%"))
                 .ToListAsync();
 
             if (!availableAffixes.Any())
                 return;
 
-            // Exclude already present affixes (no duplicates)
             var existingAffixIds = item.Affixes.Select(a => a.AffixDefinitionId).ToList();
             var selectableAffixes = availableAffixes
                 .Where(a => !existingAffixIds.Contains(a.Id))
