@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Application/Services/CombatService.cs
+// AtlasRPG.Application/Services/CombatService.cs
 using AtlasRPG.Core.Entities.Combat;
 using AtlasRPG.Core.Entities.Runs;
 using AtlasRPG.Core.Entities.GameData;
@@ -107,6 +107,20 @@ namespace AtlasRPG.Application.Services
             {
                 var round = new CombatRound { RoundNumber = roundNumber };
 
+                decimal playerDotDamage = SkillEffectApplier.TickStatusEffects(playerStats);
+                decimal opponentDotDamage = SkillEffectApplier.TickStatusEffects(opponentStats);
+
+                playerStats.CurrentHp -= playerDotDamage;
+                opponentStats.CurrentHp -= opponentDotDamage;
+
+                if (playerStats.CurrentHp <= 0 || opponentStats.CurrentHp <= 0)
+                {
+                    round.PlayerHpRemaining = playerStats.CurrentHp;
+                    round.OpponentHpRemaining = opponentStats.CurrentHp;
+                    combatResult.Rounds.Add(round);
+                    break;
+                }
+
                 // ── Sudden Death (round 16+) ──────────────────────────
                 if (roundNumber > MaxNormalRounds)
                 {
@@ -147,6 +161,11 @@ namespace AtlasRPG.Application.Services
                     playerStats.CurrentMana -= effectiveManaCost;
                     playerFirstSkillUsed = true;
                     playerSkillCooldown = effectiveSkillCooldown;
+
+                    SkillEffectApplier.ApplyOnUse(
+                        playerStats, opponentStats,
+                        activeSkill.EffectJson,
+                        actingFirst: playerActsFirst);
                 }
 
                 // ── Opponent her zaman basic attack ───────────────────
@@ -161,15 +180,18 @@ namespace AtlasRPG.Application.Services
                         playerAction, playerMultiplier,
                         round, isPlayer: true,
                         attackerGoesFirst: playerHasFirstStrike,
-                        ref opponentFirstHitReceived);
+                        ref opponentFirstHitReceived,
+                        activeSkill: playerAction != "BasicAttack" ? activeSkill : null); // ← EKLENDI
 
-                    if (opponentStats.CurrentHp > 0)
+                    if (opponentStats.CurrentHp > 0 && !opponentStats.IsStunned) // ← IsStunned kontrolü
+                    {
                         ExecuteActionWithPassives(
                             opponentStats, playerStats,
                             opponentAction, opponentMultiplier,
                             round, isPlayer: false,
                             attackerGoesFirst: !playerHasFirstStrike,
                             ref playerFirstHitReceived);
+                    }
                 }
                 else
                 {
@@ -179,6 +201,7 @@ namespace AtlasRPG.Application.Services
                         round, isPlayer: false,
                         attackerGoesFirst: !playerHasFirstStrike,
                         ref playerFirstHitReceived);
+                    // activeSkill yok
 
                     if (playerStats.CurrentHp > 0)
                         ExecuteActionWithPassives(
@@ -186,8 +209,12 @@ namespace AtlasRPG.Application.Services
                             playerAction, playerMultiplier,
                             round, isPlayer: true,
                             attackerGoesFirst: playerHasFirstStrike,
-                            ref opponentFirstHitReceived);
+                            ref opponentFirstHitReceived,
+                            activeSkill: playerAction != "BasicAttack" ? activeSkill : null); // ← EKLENDI
                 }
+
+                playerStats.IsStunned = false;
+                opponentStats.IsStunned = false;
 
                 round.PlayerHpRemaining = playerStats.CurrentHp;
                 round.OpponentHpRemaining = opponentStats.CurrentHp;
@@ -229,7 +256,8 @@ namespace AtlasRPG.Application.Services
             CombatRound round,
             bool isPlayer,
             bool attackerGoesFirst,
-            ref bool defenderFirstHitReceived)
+            ref bool defenderFirstHitReceived,
+            SkillDefinition? activeSkill = null)
         {
             var pPb = attacker.PassiveBonuses;
             var dPb = defender.PassiveBonuses;
@@ -264,6 +292,20 @@ namespace AtlasRPG.Application.Services
             // ── Defender-side damage taken modifier ───────────────────
             if (action.DidHit && action.FinalDamage > 0)
             {
+                // ✅ OnHit skill efektleri
+                if (isPlayer && activeSkill != null)
+                {
+                    SkillEffectApplier.ApplyOnHit(
+                        attacker, defender,
+                        activeSkill.EffectJson,
+                        attacker.BaseDamage);
+                }
+
+                // Mark varsa DamageTaken artır
+                var markEffect = defender.StatusEffects.FirstOrDefault(e => e.Type == "Mark");
+                if (markEffect != null)
+                    action.FinalDamage *= markEffect.DamageTakenMult;
+
                 decimal takenMult = 1.0m;
 
                 // Brace (N12) — turn içi ilk hit
@@ -275,12 +317,11 @@ namespace AtlasRPG.Application.Services
 
                 // Unyielding (N13) — düşük HP
                 decimal defHpRatio = defender.MaxHp > 0
-                    ? defender.CurrentHp / defender.MaxHp
-                    : 0m;
+                    ? defender.CurrentHp / defender.MaxHp : 0m;
                 if (defHpRatio < dPb.LowHpThreshold && dPb.LowHpDamageTakenMult < 1.0m)
                     takenMult *= dPb.LowHpDamageTakenMult;
 
-                // Guarded (N39 1H Sword) — block başarılıysa
+                // Guarded (N39) — block başarılıysa
                 if (action.WasBlocked && dPb.BlockSuccessDamageTakenMult < 1.0m)
                     takenMult *= dPb.BlockSuccessDamageTakenMult;
 
@@ -331,8 +372,9 @@ namespace AtlasRPG.Application.Services
                 .FirstOrDefaultAsync(b => b.Race == run.Race)
                 ?? throw new InvalidOperationException($"BaseStatDefinition not found for race: {run.Race}");
 
+            // ✅ DÜZELTME 1: .AsSplitQuery() kaldırıldı — tek sorgu olarak çalışır,
+            // SQL Server'da WITH syntax hatası vermez
             var runWithData = await _context.Runs
-                // Equipment
                 .Include(r => r.Equipment)
                     .ThenInclude(e => e.Weapon)
                     .ThenInclude(ri => ri!.Item)
@@ -353,22 +395,34 @@ namespace AtlasRPG.Application.Services
                     .ThenInclude(ri => ri!.Item)
                     .ThenInclude(i => i.Affixes)
                     .ThenInclude(a => a.AffixDefinition)
-                // ⭐ Passive nodes (NodeId listesi yeterli)
                 .Include(r => r.AllocatedPassives)
-                .AsSplitQuery()
+                // ✅ AsSplitQuery() KALDIRILDI
                 .FirstOrDefaultAsync(r => r.Id == run.Id)
                 ?? run;
 
-            // Allocated node'ların tanımlarını toplu çek
             var allocatedNodeIds = runWithData.AllocatedPassives
                 .Select(p => p.NodeId)
-                .ToList();
+                .ToHashSet(); // HashSet — Contains O(1)
 
-            List<PassiveNodeDefinition> allocatedDefs = allocatedNodeIds.Count > 0
-                ? await _context.PassiveNodeDefinitions
+            List<PassiveNodeDefinition> allocatedDefs;
+
+            if (allocatedNodeIds.Count > 0)
+            {
+                // ✅ DÜZELTME 2: Contains() kullanmak yerine tüm node'ları çek,
+                // hafızada filtrele — 60 node küçük bir tablo, sıkıntı yok.
+                // EF Core 8 List<string>.Contains() → OPENJSON CTE üretir → SQL Server hatası
+                var allNodes = await _context.PassiveNodeDefinitions
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                allocatedDefs = allNodes
                     .Where(nd => allocatedNodeIds.Contains(nd.NodeId))
-                    .ToListAsync()
-                : new List<PassiveNodeDefinition>();
+                    .ToList();
+            }
+            else
+            {
+                allocatedDefs = new List<PassiveNodeDefinition>();
+            }
 
             return _statCalculator.CalculateRunStats(runWithData, baseStat, allocatedDefs);
         }
