@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Application/Services/ShopService.cs
+// AtlasRPG.Application/Services/ShopService.cs
 using AtlasRPG.Core.Entities.Runs;
 using AtlasRPG.Core.Entities.Items;
 using AtlasRPG.Core.Enums;
@@ -31,12 +31,12 @@ namespace AtlasRPG.Application.Services
                 var rarity = DetermineShopRarity(currentTurn);
                 var slot = GetRandomSlot();
 
-                // Her item ayrı ayrı oluşturuluyor, affixleri zaten DB'de
-                var item = await _itemGenerator.GenerateItem(slot, currentTurn, rarity, ClassType.Warrior);
+                // ✅ DÜZELTİLDİ: GenerateShopItem kullan — tüm weapon tipleri çıkar
+                var item = await _itemGenerator.GenerateShopItem(slot, currentTurn, rarity);
                 shopItems.Add(item);
             }
 
-            return shopItems; // Controller'da explicit loading yapılacak
+            return shopItems;
         }
 
         private ItemRarity DetermineShopRarity(int turn)
