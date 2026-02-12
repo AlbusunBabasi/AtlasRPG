@@ -20,23 +20,26 @@
     if (estOpponentMaxHp <= 0) estOpponentMaxHp = 100;
 
     // Serialize rounds for JS replay engine
-    var roundsJson = JsonSerializer.Serialize(sortedRounds.Select(r => new
-    {
-        r.RoundNumber,
-        r.PlayerAction,
-        r.PlayerHit,
-        r.PlayerCrit,
-        r.PlayerBlocked,
-        PlayerDamage = (double)r.PlayerDamage,
-        PlayerHpRemaining = (double)r.PlayerHpRemaining,
-        r.OpponentAction,
-        r.OpponentHit,
-        r.OpponentCrit,
-        r.OpponentBlocked,
-        OpponentDamage = (double)r.OpponentDamage,
-        OpponentHpRemaining = (double)r.OpponentHpRemaining,
-        r.EventLog
-    }));
+    var roundsJson = JsonSerializer.Serialize(
+            sortedRounds.Select(r => new
+            {
+                r.RoundNumber,
+                r.PlayerAction,
+                r.PlayerHit,
+                r.PlayerCrit,
+                r.PlayerBlocked,
+                PlayerDamage = (double)r.PlayerDamage,
+                PlayerHpRemaining = (double)r.PlayerHpRemaining,
+                r.OpponentAction,
+                r.OpponentHit,
+                r.OpponentCrit,
+                r.OpponentBlocked,
+                OpponentDamage = (double)r.OpponentDamage,
+                OpponentHpRemaining = (double)r.OpponentHpRemaining,
+                r.EventLog
+            }),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+        );
 
     int playerHits = sortedRounds.Count(r => r.PlayerHit);
     int opponentHits = sortedRounds.Count(r => r.OpponentHit);
@@ -1138,8 +1141,40 @@
             lbl.textContent=""; void lbl.offsetWidth;
             lbl.textContent=r.roundNumber>15?`⚡ Sudden Death — Round ${r.roundNumber}`:`Round ${r.roundNumber}`;
 
+            // ── DOT tick görsel ─────────────────────────────────────────
+            // EventLog formatı: "pDot|eDot" (örn. "23.5|0.0")
+            let pDot = 0, eDot = 0;
+            if (r.eventLog && r.eventLog.includes("|")) {
+              const parts = r.eventLog.split("|");
+              pDot = parseFloat(parts[0]) || 0;
+              eDot = parseFloat(parts[1]) || 0;
+            }
+
+            // Aktif debuffları belirle (DOT label için)
+            function dotLabel(map) {
+              if (map["Bleed"])  return { ico:"🩸", label:"Bleed",  col:"var(--bl)" };
+              if (map["Poison"]) return { ico:"☠️", label:"Poison", col:"var(--po)" };
+              if (map["Burn"])   return { ico:"🔥", label:"Burn",   col:"var(--bu)" };
+              return { ico:"💢", label:"DOT", col:"rgba(200,200,220,.5)" };
+            }
+
             tickSt("p"); tickSt("e");
-            await slp(160);
+
+            // Oyuncu DOT hasar aldıysa göster
+            if (pDot > 0.5) {
+              const lp = dotLabel(pSt);
+              addEv(`<span class="ptx" style="color:${lp.col}">${lp.ico} ${lp.label} tick — you take <strong>${Math.ceil(pDot)}</strong> damage</span>`,"proc");
+              await slp(220);
+            }
+
+            // Rakip DOT hasar aldıysa göster
+            if (eDot > 0.5) {
+              const le = dotLabel(eSt);
+              addEv(`<span class="ptx" style="color:${le.col}">${le.ico} ${le.label} tick — enemy takes <strong>${Math.ceil(eDot)}</strong> damage</span>`,"proc");
+              await slp(220);
+            }
+
+            await slp(pDot > 0.5 || eDot > 0.5 ? 80 : 160);
 
             // Player action
             if(r.playerHit){
