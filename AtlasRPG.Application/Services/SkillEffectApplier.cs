@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using AtlasRPG.Core.ValueObjects;
 
 namespace AtlasRPG.Application.Services
