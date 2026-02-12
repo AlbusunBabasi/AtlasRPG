@@ -1,366 +1,664 @@
-﻿<!-- AtlasRPG.Web/Views/Run/TurnHub.cshtml -->
+@* AtlasRPG.Web/Views/Run/TurnHub.cshtml — FULL REPLACEMENT *@
+@using AtlasRPG.Core.Enums
+@using AtlasRPG.Core.Entities.Items
+@using AtlasRPG.Web.Helpers
 @model AtlasRPG.Web.Models.RunViews.TurnHubViewModel
 @{
-    ViewData["Title"] = $"Turn {Model.CurrentTurn.TurnNumber} - {Model.Run.Race} {Model.Run.Class}";
+    ViewData["Title"] = $"Turn {Model.CurrentTurn.TurnNumber}";
+
+    // Inventory split
+    var equippedItems = Model.Inventory.Where(i => i.IsEquipped).ToList();
+    var bagItems = Model.Inventory.Where(i => !i.IsEquipped).ToList();
+
+    string RarityColor(ItemRarity r) => r switch
+    {
+        ItemRarity.Rare => "#e8c14a",
+        ItemRarity.Magic => "#5090ff",
+        _ => "#9a9a9a"
+    };
+    string RarityBorder(ItemRarity r) => r switch
+    {
+        ItemRarity.Rare => "rgba(232,193,74,.35)",
+        ItemRarity.Magic => "rgba(80,144,255,.35)",
+        _ => "rgba(150,150,150,.22)"
+    };
+    string RarityBg(ItemRarity r) => r switch
+    {
+        ItemRarity.Rare => "rgba(232,193,74,.06)",
+        ItemRarity.Magic => "rgba(80,144,255,.06)",
+        _ => "rgba(150,150,150,.04)"
+    };
+    string SlotIcon(ItemSlot s) => s switch
+    {
+        ItemSlot.Weapon => "⚔️",
+        ItemSlot.Armor => "🛡️",
+        ItemSlot.Belt => "🔰",
+        ItemSlot.Offhand => "🗡️",
+        _ => "📦"
+    };
+    string SlotLabel(ItemSlot s) => s switch
+    {
+        ItemSlot.Weapon => "Weapon",
+        ItemSlot.Armor => "Armor",
+        ItemSlot.Belt => "Belt",
+        ItemSlot.Offhand => "Offhand",
+        _ => "Item"
+    };
 }
 
-<div class="container-fluid mt-4">
-    <!-- Top Progress Bar -->
-    <div class="card mb-3">
-        <div class="card-body py-2">
-            <div class="row align-items-center">
-                <div class="col-md-3">
-                    <strong>Turn @Model.CurrentTurn.TurnNumber / 20</strong>
-                    @if (Model.CurrentTurn.IsPvp)
-                    {
-                        <span class="badge bg-danger ms-2">⚔️ PVP</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-success ms-2">🗡️ PVE</span>
-                    }
-                </div>
-                <div class="text-center mb-3">
-                    <a asp-controller="Shop" asp-action="Index" asp-route-runId="@Model.Run.Id" class="btn btn-warning btn-lg">
-                        🛒 Open Shop
-                    </a>
-                    <a asp-controller="Inventory" asp-action="Index" asp-route-runId="@Model.Run.Id" class="btn btn-info btn-lg">
-                        🎒 Manage Inventory
-                    </a>
-                    <a asp-controller="Run" asp-action="PassiveTree" asp-route-runId="@Model.Run.Id" class="btn btn-info btn-lg">
-                        Tree
-                    </a>
-                </div>
-                <div class="col-md-6">
-                    <div class="progress">
-                        <div class="progress-bar bg-warning" style="width: @((Model.CurrentTurn.TurnNumber / 20.0 * 100))%"></div>
-                    </div>
-                </div>
-                <div class="col-md-3 text-end">
-                    <span class="me-3">💰 @Model.Run.Gold Gold</span>
-                    <span class="me-3">❤️ @Model.Run.RemainingLives Lives</span>
-                    <span>⭐ Lvl @Model.Run.CurrentLevel</span>
-                </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>@ViewData["Title"] — AtlasRPG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/turnhub.css" asp-append-version="true" />
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <div id="topbar">
+        <div class="tb-prog">
+            <div class="tb-label">Run Progress — Turn @Model.CurrentTurn.TurnNumber / 20</div>
+            <div class="prog-bar">
+                <div class="prog-fill" style="width:@((Model.CurrentTurn.TurnNumber / 20.0 * 100).ToString("F0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
             </div>
+        </div>
+
+        <div class="tb-badges">
+            @if (Model.CurrentTurn.IsPvp)
+            {
+                <span class="tbdg pvp">⚔️ PVP</span>
+            }
+            else
+            {
+                <span class="tbdg pve">🗡️ PVE</span>
+            }
+
+            <span class="tbdg gold">💰 @Model.Run.Gold</span>
+            <span class="tbdg lives @(Model.Run.RemainingLives <= 1 ? "warn" : "")">❤️ @Model.Run.RemainingLives</span>
+            @if (Model.Run.PvpPoints > 0)
+            {
+                <span class="tbdg pvpts">🏆 @Model.Run.PvpPoints</span>
+            }
+            @if (Model.Run.HasWoundDebuff)
+            {
+                <span class="tbdg warn">🩸 Wounded</span>
+            }
+        </div>
+
+        <div class="tb-links">
+            @if (Model.Run.AvailableSkillPoints > 0)
+            {
+                <a href="/Run/PassiveTree/@Model.Run.Id" class="tbl pt">🌳 @Model.Run.AvailableSkillPoints Passive Pts</a>
+            }
+            else
+            {
+                <a href="/Run/PassiveTree/@Model.Run.Id" class="tbl pt">🌳 Passive Tree</a>
+            }
         </div>
     </div>
 
-    <div class="row">
-        <!-- Left Panel: Character Stats -->
-        <div class="col-md-3">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">Character</h5>
+    <!-- MAIN HUB -->
+    <div id="hub">
+
+        <!-- ════════════════ LEFT: CHARACTER ════════════════ -->
+        <div id="char-panel">
+
+            <!-- Identity -->
+            <div class="panel">
+                <div class="char-header">
+                    <div class="char-name">@Model.Run.Race.ToString() @Model.Run.Class.ToString()</div>
+                    <div class="char-sub">Level @Model.Run.CurrentLevel</div>
                 </div>
-                <div class="card-body">
-                    <h6>@Model.Run.Race @Model.Run.Class</h6>
 
-                    <hr />
+                @if (Model.Run.HasWoundDebuff)
+                {
+                    <div class="wound-warn">🩸 Wound Debuff — All stats −3%</div>
+                }
 
-                    <div class="mb-2">
-                        <small class="text-muted">HP / Mana</small>
-                        <div>❤️ @Model.MaxHp</div>
-                        <div>💧 @Model.MaxMana</div>
+                @if (Model.Run.AvailableStatPoints > 0)
+                {
+                    <div style="padding:.3rem .85rem .5rem;">
+                        <button type="button" class="alloc-badge w-100" onclick="openAllocModal()">
+                            💎 @Model.Run.AvailableStatPoints Stat Points Available — Spend Now
+                        </button>
                     </div>
+                }
 
-                    <hr />
-
-                    <div class="mb-2">
-                        <small class="text-muted">Stats</small>
-                        <div class="row g-1">
-                            <div class="col-6">STR: @Model.Run.Strength</div>
-                            <div class="col-6">DEX: @Model.Run.Dexterity</div>
-                            <div class="col-6">AGI: @Model.Run.Agility</div>
-                            <div class="col-6">INT: @Model.Run.Intelligence</div>
-                            <div class="col-6">VIT: @Model.Run.Vitality</div>
-                            <div class="col-6">WIS: @Model.Run.Wisdom</div>
-                            <div class="col-6">LUK: @Model.Run.Luck</div>
-                        </div>
+                <!-- Vitals -->
+                <div class="vitals">
+                    <div class="vital hp">
+                        <div class="vital-val">@Model.MaxHp.ToString("F0")</div>
+                        <div class="vital-lbl">HP</div>
                     </div>
-
-                    @if (Model.Run.AvailableStatPoints > 0)
+                    <div class="vital mp">
+                        <div class="vital-val">@Model.MaxMana.ToString("F0")</div>
+                        <div class="vital-lbl">Mana</div>
+                    </div>
+                    @if (Model.Ward > 0)
                     {
-                        <div class="alert alert-info py-1 px-2 mt-2">
-                            <small>💎 @Model.Run.AvailableStatPoints stat points available!</small>
+                        <div class="vital wd">
+                            <div class="vital-val">@Model.Ward.ToString("F0")</div>
+                            <div class="vital-lbl">Ward</div>
                         </div>
                     }
+                    <div class="vital iv">
+                        <div class="vital-val">@Model.Initiative.ToString("F0")</div>
+                        <div class="vital-lbl">Initiative</div>
+                    </div>
+                </div>
 
-                    @if (Model.Run.HasWoundDebuff)
+                <!-- Raw Stats -->
+                <div class="stats-section">
+                    <div class="ss-title">Attributes</div>
+                    @foreach (var (lbl, val) in new[] {
+                    ("STR", Model.Run.Strength.ToString()),
+                    ("DEX", Model.Run.Dexterity.ToString()),
+                    ("AGI", Model.Run.Agility.ToString()),
+                    ("INT", Model.Run.Intelligence.ToString()),
+                    ("VIT", Model.Run.Vitality.ToString()),
+                    ("WIS", Model.Run.Wisdom.ToString()),
+                    ("LUK", Model.Run.Luck.ToString()),
+                    })
                     {
-                        <div class="alert alert-danger py-1 px-2 mt-2">
-                            <small>🩸 Wound: -3% all stats</small>
+                        <div class="stat-row">
+                            <span class="stat-k">@lbl</span>
+                            <span class="stat-v">@val</span>
+                        </div>
+                    }
+                </div>
+
+                <!-- Combat Stats -->
+                <div class="stats-section">
+                    <div class="ss-title">Combat</div>
+                    @foreach (var (lbl, val, pct) in new[] {
+                    ("Damage",   Model.Damage.ToString("F1"),                          false),
+                    ("Armor",    Model.Armor.ToString("F1"),                           false),
+                    ("Crit",     (Model.CritChance*100).ToString("F1"),                true),
+                    ("Crit×",    Model.CritMult.ToString("F2")+"×",                    false),
+                    ("Accuracy", (Model.Accuracy*100).ToString("F0"),                  true),
+                    ("Evasion",  Model.Evasion.ToString("F0"),                         false),
+                    ("Block",    Model.BlockChance>0 ? (Model.BlockChance*100).ToString("F0") : "—", Model.BlockChance>0),
+                    ("Arm.Pen",  Model.ArmorPen>0 ? (Model.ArmorPen*100).ToString("F0") : "—", Model.ArmorPen>0),
+                    })
+                    {
+                        <div class="stat-row">
+                            <span class="stat-k">@lbl</span>
+                            <span class="stat-v @(val != "—" ? "hi" : "")">@val@(pct && val != "—" ? "%" : "")</span>
+                        </div>
+                    }
+                </div>
+
+                <!-- Resistances -->
+                <div class="stats-section">
+                    <div class="ss-title">Resistances</div>
+                    @foreach (var (lbl, val) in new[] {
+                    ("Fire",      (Model.FireResist * 100).ToString("F0") + "%"),
+                    ("Cold",      (Model.ColdResist * 100).ToString("F0") + "%"),
+                    ("Lightning", (Model.LightResist * 100).ToString("F0") + "%"),
+                    ("Chaos",     (Model.ChaosResist * 100).ToString("F0") + "%"),
+                    })
+                    {
+                        <div class="stat-row">
+                            <span class="stat-k">@lbl</span>
+                            <span class="stat-v">@val</span>
                         </div>
                     }
                 </div>
             </div>
 
-            <!-- Combat Stats Preview -->
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0">Combat Stats</h6>
-                </div>
-                <div class="card-body">
-                    <div class="small">
-                        <div>⚔️ Damage: @Model.Damage.ToString("F1")</div>
-                        <div>🛡️ Armor: @Model.Armor.ToString("F1")</div>
-                        <div>💥 Crit: @((Model.CritChance * 100).ToString("F1"))%</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </div><!-- /left -->
+        <!-- ════════════════ CENTER ════════════════ -->
+        <div id="center-panel">
 
-        <!-- Center Panel: Equipment -->
-        <div class="col-md-6">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">Equipment</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <!-- Weapon Slot -->
-                        <div class="col-6 mb-3">
-                            <div class="equipment-slot">
-                                <h6>🗡️ Weapon</h6>
-                                @if (Model.Equipment?.Weapon?.Item != null)
+            <!-- Equipment Doll -->
+            <div class="panel">
+                <div class="ph"><span class="ph-title">Equipment</span></div>
+                <div class="equip-grid">
+                    @{
+                        var slots = new[] {
+                    ("Weapon",  "eslot", Model.Equipment?.Weapon?.Item),
+                    ("Armor",   "eslot", Model.Equipment?.Armor?.Item),
+                    ("Belt",    "eslot", Model.Equipment?.Belt?.Item),
+                    ("Offhand", "eslot", Model.Equipment?.Offhand?.Item),
+                    };
+                    }
+                    @foreach (var (slotName, _, item) in slots)
+                    {
+                        if (item != null)
+                        {
+                            var rarCls = item.Rarity switch { ItemRarity.Rare => "rr", ItemRarity.Magic => "rm", _ => "rn" };
+                            var runItemId = Model.Inventory.FirstOrDefault(i => i.IsEquipped && i.Item?.Id == item.Id)?.Id;
+                            <div class="eslot filled @rarCls" title="@ItemIconMapper.GetDisplayName(item)">
+                                <div class="eslot-label">@slotName</div>
+                                <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.2rem;">
+                                    <img src="@ItemIconMapper.GetIconPath(item)"
+                                         style="width:22px;height:22px;object-fit:contain;filter:brightness(0) invert(1) opacity(.6);"
+                                         onerror="this.style.display='none'" alt="" />
+                                    <div class="eslot-name">@ItemIconMapper.GetDisplayName(item)</div>
+                                </div>
+                                <div class="eslot-type">@ItemIconMapper.GetSubTypeName(item) · iLv @item.ItemLevel</div>
+                                @foreach (var aff in item.Affixes.Take(3))
                                 {
-                                    var item = Model.Equipment.Weapon.Item;
-                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
-                                        <strong>@item.WeaponType</strong>
-                                        <div class="small">ilvl @item.ItemLevel</div>
-                                        <div class="small text-muted">
-                                            @foreach (var affix in item.Affixes)
-                                            {
-                                                <div>@affix.AffixDefinition.DisplayName: @affix.RolledValue.ToString("F1")</div>
-                                            }
+                                    <div class="eslot-affix">@aff.AffixDefinition?.DisplayName @ItemIconMapper.FormatAffixValue(aff)</div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="eslot">
+                                <div class="eslot-label">@slotName</div>
+                                <div class="eslot-empty">Empty slot</div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Skill Selection -->
+            <div class="panel" id="skill-panel">
+                <div class="ph">
+                    <span class="ph-title">Active Skill</span>
+                    @if (Model.Equipment?.Weapon?.Item != null)
+                    {
+                        <span class="skill-wtype">@Model.Equipment.Weapon.Item.WeaponType</span>
+                    }
+                </div>
+                <div class="pb">
+                    @if (Model.AvailableSkills.Any() && Model.Equipment?.Weapon != null)
+                    {
+                        <form asp-controller="Run" asp-action="StartCombat" method="post" id="combatForm">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="TurnId" value="@Model.CurrentTurn.Id" />
+
+                            <div class="skills-grid" id="skillsGrid">
+                                @foreach (var skill in Model.AvailableSkills)
+                                {
+                                    bool isSelected = Model.LastSelectedSkillId.HasValue
+                                    ? Model.LastSelectedSkillId.Value == skill.Id
+                                    : Model.AvailableSkills.First().Id == skill.Id;
+
+                                    string skillIcon = skill.WeaponType.ToString() switch
+                                    {
+                                        "Bow" => "🏹",
+                                        "Wand" => "⚡",
+                                        "Staff" => "🔥",
+                                        "TwoHandSword" => "⚔️",
+                                        "Dagger" => "🗡️",
+                                        _ => "⚔️"
+                                    };
+
+                                    <label class="skill-opt @(isSelected ? "selected" : "")" onclick="selectSkill(this)">
+                                        <input type="radio" name="SelectedSkillId" value="@skill.Id" @(isSelected ? "checked" : "") />
+                                        <div class="skill-icon">@skillIcon</div>
+                                        <div class="skill-info">
+                                            <div class="skill-name">@skill.DisplayName</div>
+                                            <div class="skill-badges">
+                                                <span class="sk-b sk-mult">@skill.Multiplier.ToString("F2")×</span>
+                                                @if (skill.ManaCost > 0)
+                                                {
+                                                    <span class="sk-b sk-mana">@skill.ManaCost mana</span>
+                                                }
+                                                @if (skill.Cooldown > 0)
+                                                {
+                                                    <span class="sk-b sk-cd">CD @skill.Cooldown</span>
+                                                }
+                                            </div>
+                                            <div class="skill-desc">@skill.Description</div>
                                         </div>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="empty-slot">Empty</div>
+                                    </label>
                                 }
                             </div>
-                        </div>
 
-                        <!-- Armor Slot -->
-                        <div class="col-6 mb-3">
-                            <div class="equipment-slot">
-                                <h6>🛡️ Armor</h6>
-                                @if (Model.Equipment?.Armor?.Item != null)
-                                {
-                                    var item = Model.Equipment.Armor.Item;
-                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
-                                        <strong>Armor</strong>
-                                        <div class="small">ilvl @item.ItemLevel</div>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="empty-slot">Empty</div>
-                                }
+                            <!-- Fight Button -->
+                            <div class="fight-wrap" style="padding:.7rem 0 0;">
+                                <button type="submit" class="btn-fight @(Model.CurrentTurn.IsPvp ? "pvp" : "pve")">
+                                    @(Model.CurrentTurn.IsPvp ? "⚔️  Start PVP Battle" : "🗡️  Start Encounter")
+                                </button>
                             </div>
+                        </form>
+                    }
+                    else if (Model.Equipment?.Weapon == null)
+                    {
+                        <div style="padding:.5rem;text-align:center;color:rgba(200,200,220,.3);font-size:.8rem;">
+                            No weapon equipped — equip a weapon to unlock skills
                         </div>
-
-                        <!-- Belt Slot -->
-                        <div class="col-6 mb-3">
-                            <div class="equipment-slot">
-                                <h6>📿 Belt</h6>
-                                @if (Model.Equipment?.Belt?.Item != null)
-                                {
-                                    var item = Model.Equipment.Belt.Item;
-                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
-                                        <strong>Belt</strong>
-                                        <div class="small">ilvl @item.ItemLevel</div>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="empty-slot">Empty</div>
-                                }
-                            </div>
+                        <div class="fight-wrap" style="padding:.7rem 0 0;">
+                            <button class="btn-fight @(Model.CurrentTurn.IsPvp ? "pvp" : "pve")" disabled>
+                                Equip a Weapon First
+                            </button>
                         </div>
-
-                        <!-- Offhand Slot -->
-                        <div class="col-6 mb-3">
-                            <div class="equipment-slot">
-                                <h6>🔰 Offhand</h6>
-                                @if (Model.Equipment?.Offhand?.Item != null)
-                                {
-                                    var item = Model.Equipment.Offhand.Item;
-                                    <div class="item-card rarity-@item.Rarity.ToString().ToLower()">
-                                        <strong>Offhand</strong>
-                                        <div class="small">ilvl @item.ItemLevel</div>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="empty-slot">Empty</div>
-                                }
-                            </div>
+                    }
+                    else
+                    {
+                        <div style="padding:.5rem;text-align:center;color:rgba(200,200,220,.3);font-size:.8rem;">
+                            No skills available for current weapon at your level
                         </div>
-                    </div>
+                    }
                 </div>
             </div>
 
-            <!-- Start Combat Button -->
-            <div class="text-center">
-                <form asp-action="StartCombat" asp-route-turnId="@Model.CurrentTurn.Id" method="post">
+        </div><!-- /center -->
+        <!-- ════════════════ RIGHT: TABS ════════════════ -->
+        <div class="panel" style="display:flex;flex-direction:column;height:fit-content;max-height:calc(100vh - 68px);overflow:hidden;">
+
+            @if (TempData["Success"] != null)
+            {
+                <div class="notif ok">✓ @TempData["Success"]</div>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <div class="notif err">✕ @TempData["Error"]</div>
+            }
+
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('inv',this)">Inventory</button>
+                <button class="tab-btn" onclick="switchTab('shop',this)">Shop</button>
+            </div>
+
+            <!-- INVENTORY TAB -->
+            <div class="tab-content active" id="tab-inv">
+
+                @if (Model.Run.AvailableSkillPoints > 0)
+                {
+                    <div class="passives-cta">
+                        <span>🌳 @Model.Run.AvailableSkillPoints passive point@(Model.Run.AvailableSkillPoints > 1 ? "s" : "") available</span>
+                        <a href="/Run/PassiveTree/@Model.Run.Id">Spend</a>
+                    </div>
+                }
+
+                @if (equippedItems.Any())
+                {
+                    <div class="inv-section"><span class="inv-sec-lbl">Equipped</span></div>
+                    @foreach (var ri in equippedItems)
+                    {
+                        if (ri.Item == null) continue;
+                        var rarCls = ri.Item.Rarity switch { ItemRarity.Rare => "rr", ItemRarity.Magic => "rm", _ => "rn" };
+                        var sellP = (ri.Item.Rarity switch { ItemRarity.Rare => "30", ItemRarity.Magic => "15", _ => "8" });
+                        <div class="item-card @rarCls">
+                            <div class="ic-img-wrap">
+                                <img src="@ItemIconMapper.GetIconPath(ri.Item)"
+                                     class="ic-img"
+                                     alt="@ItemIconMapper.GetDisplayName(ri.Item)"
+                                     onerror="this.classList.add('broken')" />
+                                <span class="ic-fallback">@ItemIconMapper.GetFallbackEmoji(ri.Item)</span>
+                            </div>
+                            <div class="ic-body">
+                                <div class="ic-header">
+                                    <div class="ic-name">@ItemIconMapper.GetDisplayName(ri.Item)</div>
+                                    <div class="ic-slot">@ri.Item.Slot</div>
+                                </div>
+                                <div class="ic-meta">@ItemIconMapper.GetSubTypeName(ri.Item) · iLv @ri.Item.ItemLevel · @ItemIconMapper.GetRarityLabel(ri.Item.Rarity)</div>
+                                @if (ri.Item.Affixes.Any())
+                                {
+                                    <div class="ic-affixes">
+                                        @foreach (var aff in ri.Item.Affixes)
+                                        {
+                                            <div class="ic-aff">@aff.AffixDefinition?.DisplayName @ItemIconMapper.FormatAffixValue(aff)</div>
+                                        }
+                                    </div>
+                                }
+                                <div class="ic-actions">
+                                    <span class="ic-equipped-badge">✓ Equipped</span>
+                                    <form asp-controller="Inventory" asp-action="Unequip" method="post" style="display:inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="runId" value="@Model.Run.Id" />
+                                        <input type="hidden" name="runItemId" value="@ri.Id" />
+                                        <button type="submit" class="ic-btn unequip">Unequip</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+
+                @if (bagItems.Any())
+                {
+                    <div class="inv-section"><span class="inv-sec-lbl">Backpack (@bagItems.Count)</span></div>
+                    @foreach (var ri in bagItems)
+                    {
+                        if (ri.Item == null) continue;
+                        var rarCls = ri.Item.Rarity switch { ItemRarity.Rare => "rr", ItemRarity.Magic => "rm", _ => "rn" };
+                        int sellPri = ri.Item.Rarity switch { ItemRarity.Rare => 30, ItemRarity.Magic => 15, _ => 8 };
+                        sellPri += ri.Item.ItemLevel * 2;
+                        <div class="item-card @rarCls">
+                            <div class="ic-img-wrap">
+                                <img src="@ItemIconMapper.GetIconPath(ri.Item)"
+                                     class="ic-img"
+                                     alt="@ItemIconMapper.GetDisplayName(ri.Item)"
+                                     onerror="this.classList.add('broken')" />
+                                <span class="ic-fallback">@ItemIconMapper.GetFallbackEmoji(ri.Item)</span>
+                            </div>
+                            <div class="ic-body">
+                                <div class="ic-header">
+                                    <div class="ic-name">@ItemIconMapper.GetDisplayName(ri.Item)</div>
+                                    <div class="ic-slot">@ri.Item.Slot</div>
+                                </div>
+                                <div class="ic-meta">@ItemIconMapper.GetSubTypeName(ri.Item) · iLv @ri.Item.ItemLevel · @ItemIconMapper.GetRarityLabel(ri.Item.Rarity)</div>
+                                @if (ri.Item.Affixes.Any())
+                                {
+                                    <div class="ic-affixes">
+                                        @foreach (var aff in ri.Item.Affixes)
+                                        {
+                                            <div class="ic-aff">@aff.AffixDefinition?.DisplayName @ItemIconMapper.FormatAffixValue(aff)</div>
+                                        }
+                                    </div>
+                                }
+                                <div class="ic-actions">
+                                    <form asp-controller="Inventory" asp-action="Equip" method="post" style="display:inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="runId" value="@Model.Run.Id" />
+                                        <input type="hidden" name="runItemId" value="@ri.Id" />
+                                        <button type="submit" class="ic-btn equip">Equip</button>
+                                    </form>
+                                    <form asp-controller="Shop" asp-action="Sell" method="post" style="display:inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="runId" value="@Model.Run.Id" />
+                                        <input type="hidden" name="runItemId" value="@ri.Id" />
+                                        <button type="submit" class="ic-btn sell">Sell @sellPri g</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+
+                @if (!equippedItems.Any() && !bagItems.Any())
+                {
+                    <div style="padding:2rem;text-align:center;color:rgba(180,180,200,.28);font-size:.8rem;">
+                        No items — visit the Shop tab
+                    </div>
+                }
+            </div><!-- /tab-inv -->
+            <!-- SHOP TAB -->
+            <div class="tab-content" id="tab-shop">
+                @{
+                    var shopItems = ViewBag.ShopItems as List<AtlasRPG.Core.Entities.Items.Item>;
+                    var shopPrices = ViewBag.ShopPrices as Dictionary<Guid, int>;
+                }
+                @if (shopItems != null && shopItems.Any())
+                {
+                    @foreach (var item in shopItems)
+                    {
+                        var rarCls = item.Rarity switch { ItemRarity.Rare => "rr", ItemRarity.Magic => "rm", _ => "rn" };
+                        int price = shopPrices != null && shopPrices.TryGetValue(item.Id, out var p) ? p : 20;
+                        bool canAfford = Model.Run.Gold >= price;
+
+                        <div class="item-card @rarCls">
+                            <div class="ic-img-wrap">
+                                <img src="@ItemIconMapper.GetIconPath(item)"
+                                     class="ic-img"
+                                     alt="@ItemIconMapper.GetDisplayName(item)"
+                                     onerror="this.classList.add('broken')" />
+                                <span class="ic-fallback">@ItemIconMapper.GetFallbackEmoji(item)</span>
+                            </div>
+                            <div class="ic-body">
+                                <div class="ic-header">
+                                    <div class="ic-name">@ItemIconMapper.GetDisplayName(item)</div>
+                                    <div class="ic-slot">@item.Slot</div>
+                                </div>
+                                <div class="ic-meta">@ItemIconMapper.GetSubTypeName(item) · iLv @item.ItemLevel · @ItemIconMapper.GetRarityLabel(item.Rarity)</div>
+                                @if (item.Affixes.Any())
+                                {
+                                    <div class="ic-affixes">
+                                        @foreach (var aff in item.Affixes)
+                                        {
+                                            <div class="ic-aff">@aff.AffixDefinition?.DisplayName @ItemIconMapper.FormatAffixValue(aff)</div>
+                                        }
+                                    </div>
+                                }
+                                <div class="ic-actions">
+                                    <form asp-controller="Shop" asp-action="Buy" method="post" style="display:inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="runId" value="@Model.Run.Id" />
+                                        <input type="hidden" name="itemId" value="@item.Id" />
+                                        <button type="submit" class="ic-btn buy" @(!canAfford ? "disabled" : "")
+                                                title="@(!canAfford ? "Not enough gold" : "")">
+                                            Buy @price g
+                                        </button>
+                                    </form>
+                                    <span class="ic-price">@price 💰</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div style="padding:2rem;text-align:center;color:rgba(180,180,200,.28);font-size:.8rem;">
+                        Loading shop items...
+                    </div>
+                }
+
+                <div class="upgrade-link-wrap">
+                    <a href="/Shop/Index?runId=@Model.Run.Id" class="upgrade-link">
+                        🔧 Upgrade Shop — Enhance &amp; Reroll Items
+                    </a>
+                </div>
+            </div><!-- /tab-shop -->
+
+        </div><!-- /right panel -->
+
+    </div><!-- /hub -->
+    <!-- STAT ALLOC MODAL -->
+    @if (Model.Run.AvailableStatPoints > 0)
+    {
+        <div class="modal-ov" id="allocModal" style="display:none">
+            <div class="modal-box">
+                <button class="modal-close" onclick="closeAllocModal()">✕</button>
+                <div class="modal-title">💎 Allocate Stat Points</div>
+                <div class="alloc-pts">Points remaining: <span id="remPts">@Model.Run.AvailableStatPoints</span></div>
+
+                <form asp-controller="Run" asp-action="AllocateStats" method="post" id="allocForm">
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-primary btn-lg px-5">
-                        ⚔️ Start @(Model.CurrentTurn.IsPvp ? "PVP" : "PVE") Battle
+                    <input type="hidden" name="RunId" value="@Model.Run.Id" />
+                    <input type="hidden" name="AvailablePoints" value="@Model.Run.AvailableStatPoints" />
+
+                    <div class="alloc-grid">
+                        @foreach (var (nm, field, cur, hint) in new[] {
+                    ("💪 Strength",     "StrengthToAdd",     Model.Run.Strength,     "Phys damage & melee"),
+                    ("🎯 Dexterity",    "DexterityToAdd",    Model.Run.Dexterity,    "Ranged dmg & accuracy"),
+                    ("⚡ Agility",      "AgilityToAdd",      Model.Run.Agility,      "Initiative & evasion"),
+                    ("🧠 Intelligence", "IntelligenceToAdd", Model.Run.Intelligence, "Spell damage & mana"),
+                    ("❤️ Vitality",     "VitalityToAdd",     Model.Run.Vitality,     "HP & survivability"),
+                    ("🌊 Wisdom",       "WisdomToAdd",       Model.Run.Wisdom,       "Mana regen & ward"),
+                    ("🍀 Luck",         "LuckToAdd",         Model.Run.Luck,         "Crit & drops"),
+                    })
+                        {
+                            <div class="alloc-row">
+                                <div class="alloc-name">@nm</div>
+                                <div class="alloc-current">Current: @cur · <span style="color:rgba(200,200,220,.45);font-size:.63rem;">@hint</span></div>
+                                <div class="alloc-ctrl">
+                                    <button type="button" class="alloc-btn" onclick="adjustStat('@field',-1)" id="btn_dec_@field">−</button>
+                                    <div class="alloc-num" id="val_@field">0</div>
+                                    <input type="hidden" name="@field" id="inp_@field" value="0" />
+                                    <button type="button" class="alloc-btn" onclick="adjustStat('@field',1)" id="btn_inc_@field">+</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <button type="submit" class="btn-alloc-submit" id="allocSubmit" disabled>
+                        Confirm Allocation
                     </button>
                 </form>
             </div>
         </div>
-
-        <!-- Right Panel: Skills -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Active Skills</h5>
-                </div>
-                <div class="card-body">
-                    @if (Model.AvailableSkills.Any())
-                    {
-                        <form asp-action="StartCombat" method="post" id="combatForm">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="TurnId" value="@Model.CurrentTurn.Id" />
-
-                            <p class="small text-muted mb-3">Select 1 skill for this turn:</p>
-
-                            @foreach (var skill in Model.AvailableSkills)
-                            {
-                                <label class="skill-card mb-2 p-2 d-block" style="cursor: pointer;">
-                                    <input type="radio"
-                                           name="SelectedSkillId"
-                                           value="@skill.Id"
-                                           class="skill-radio d-none"
-                                           required />
-                                    <div class="skill-content">
-                                        <strong>@skill.DisplayName</strong>
-                                        <div class="small mt-1">
-                                            <span class="badge bg-info">@skill.Multiplier.ToString("F2")x</span>
-                                            <span class="badge bg-primary">@skill.ManaCost mana</span>
-                                            <span class="badge bg-secondary">CD: @skill.Cooldown</span>
-                                        </div>
-                                        <div class="small text-muted mt-1">@skill.Description</div>
-                                    </div>
-                                </label>
-                            }
-
-                            <button type="submit" class="btn btn-primary w-100 mt-3" id="startBattleBtn">
-                                ⚔️ Start @(Model.CurrentTurn.IsPvp ? "PVP" : "PVE") Battle
-                            </button>
-                        </form>
-                    }
-                    else
-                    {
-                        <p class="text-muted">No weapon equipped</p>
-                    }
-                </div>
-            </div>
-
-            @if (Model.Run.AvailableStatPoints > 0 || Model.Run.AvailableSkillPoints > 0)
-            {
-                <div class="card mt-3">
-                    <div class="card-body text-center">
-                        @if (Model.Run.AvailableStatPoints > 0)
-                        {
-                            <a asp-action="AllocateStats" asp-route-id="@Model.Run.Id" class="btn btn-warning btn-sm w-100 mb-2">
-                                💎 Allocate @Model.Run.AvailableStatPoints Stat Points
-                            </a>
-                        }
-                        @if (Model.Run.AvailableSkillPoints > 0)
-                        {
-                            <a asp-action="PassiveTree" asp-route-id="@Model.Run.Id" class="btn btn-info btn-sm w-100">
-                                🌳 Spend @Model.Run.AvailableSkillPoints Passive Points
-                            </a>
-                        }
-                    </div>
-                </div>
-            }
-        </div>
-    </div>
-</div>
-
-<style>
-    .equipment-slot {
-        padding: 10px;
-        border: 1px dashed #555;
-        border-radius: 5px;
-        min-height: 150px;
     }
 
-    .empty-slot {
-        padding: 20px;
-        color: #666;
-        font-style: italic;
-    }
-
-    .item-card {
-        padding: 10px;
-        border-radius: 5px;
-        border: 2px solid;
-    }
-
-    .rarity-normal {
-        border-color: #888;
-        background: rgba(136, 136, 136, 0.1);
-    }
-
-    .rarity-magic {
-        border-color: #4169E1;
-        background: rgba(65, 105, 225, 0.1);
-    }
-
-    .rarity-rare {
-        border-color: #FFD700;
-        background: rgba(255, 215, 0, 0.1);
-    }
-
-    .skill-card {
-        border: 1px solid #444;
-        border-radius: 5px;
-        background: rgba(30, 30, 50, 0.5);
-    }
-
-    .skill-card {
-        border: 2px solid #444;
-        border-radius: 5px;
-        background: rgba(30, 30, 50, 0.5);
-        transition: all 0.3s;
-    }
-
-        .skill-card:hover {
-            border-color: #e94560;
-            background: rgba(233, 69, 96, 0.1);
+    <script>
+        // ── TABS
+        function switchTab(id, btn) {
+          document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.getElementById('tab-' + id).classList.add('active');
+          btn.classList.add('active');
         }
 
-    .skill-radio:checked + .skill-content {
-        /* Visual feedback */
-    }
+        // ── SKILL SELECT
+        function selectSkill(lbl) {
+          document.querySelectorAll('.skill-opt').forEach(o => o.classList.remove('selected'));
+          lbl.classList.add('selected');
+          lbl.querySelector('input').checked = true;
+        }
 
-    .skill-radio:checked ~ .skill-content,
-    input[type="radio"]:checked + .skill-content {
-        background: rgba(233, 69, 96, 0.2);
-    }
+        // ── STAT ALLOC MODAL
+        const MAX_PTS = @Model.Run.AvailableStatPoints;
+        const FIELDS  = ['StrengthToAdd','DexterityToAdd','AgilityToAdd','IntelligenceToAdd','VitalityToAdd','WisdomToAdd','LuckToAdd'];
+        let allocs = {};
+        FIELDS.forEach(f => allocs[f] = 0);
 
-    /* Fix for radio selection visual */
-    .skill-card:has(.skill-radio:checked) {
-        border-color: #e94560;
-        background: rgba(233, 69, 96, 0.15);
-    }
-</style>
-<script>
-    // Skill selection feedback
-    document.querySelectorAll('.skill-radio').forEach(radio => {
-        radio.addEventListener('change', function() {
-            document.querySelectorAll('.skill-card').forEach(card => {
-                card.style.borderColor = '#444';
-            });
-            if (this.checked) {
-                this.closest('.skill-card').style.borderColor = '#e94560';
-            }
+        function used() { return FIELDS.reduce((s,f) => s + allocs[f], 0); }
+
+        function adjustStat(field, delta) {
+          const cur = allocs[field];
+          const nxt = cur + delta;
+          if (nxt < 0) return;
+          if (delta > 0 && used() >= MAX_PTS) return;
+          allocs[field] = nxt;
+          document.getElementById('val_' + field).textContent = nxt;
+          document.getElementById('inp_' + field).value = nxt;
+          const rem = MAX_PTS - used();
+          document.getElementById('remPts').textContent = rem;
+          document.getElementById('allocSubmit').disabled = used() === 0;
+          // disable inc buttons if no pts left
+          FIELDS.forEach(f => {
+            const btn = document.getElementById('btn_inc_' + f);
+            if (btn) btn.disabled = rem === 0;
+          });
+        }
+
+        function openAllocModal() {
+          FIELDS.forEach(f => {
+            allocs[f] = 0;
+            document.getElementById('val_' + f).textContent = '0';
+            document.getElementById('inp_' + f).value = '0';
+          });
+          document.getElementById('remPts').textContent = MAX_PTS;
+          document.getElementById('allocSubmit').disabled = true;
+          document.getElementById('allocModal').style.display = 'flex';
+        }
+
+        function closeAllocModal() {
+          document.getElementById('allocModal').style.display = 'none';
+        }
+
+        // close on overlay click
+        document.getElementById('allocModal')?.addEventListener('click', function(e) {
+          if (e.target === this) closeAllocModal();
         });
-    });
-</script>
+
+        // Auto-open shop tab if TempData has error and shop was last action
+        @if (TempData["ShopAction"] != null)
+        {
+            <text>
+              document.querySelector('[onclick="switchTab(\'shop\',this)"]')?.click();
+            </text>
+        }
+    </script>
+
+</body>
+</html>
