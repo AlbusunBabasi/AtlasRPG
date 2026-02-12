@@ -3,6 +3,7 @@ using System.Security.Claims;
 using AtlasRPG.Application.Services;
 using AtlasRPG.Core.Entities.GameData;
 using AtlasRPG.Core.Entities.Runs;
+using AtlasRPG.Core.ValueObjects;
 using AtlasRPG.Infrastructure.Data;
 using AtlasRPG.Web.Models.RunViews;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +21,8 @@ namespace AtlasRPG.Web.Controllers
         private readonly CombatService _combatService;
         private readonly PveEncounterService _pveEncounterService;
         private readonly LootService _lootService;
+        private readonly ShopService _shopService;
+        private readonly StatCalculatorService _statCalculator;
 
 
         public RunController(
@@ -28,7 +31,9 @@ namespace AtlasRPG.Web.Controllers
             CombatService combatService,
             PveEncounterService pveEncounterService,
             BotService botService,
-            LootService lootService)
+            LootService lootService,
+            ShopService shopService,
+            StatCalculatorService statCalculatorService)
         {
             _runService = runService;
             _context = context;
@@ -36,6 +41,8 @@ namespace AtlasRPG.Web.Controllers
             _pveEncounterService = pveEncounterService;
             _botService = botService;
             _lootService = lootService;
+            _shopService = shopService;
+            _statCalculator = statCalculatorService;
         }
 
         // GET: /Run/Create
@@ -97,10 +104,23 @@ namespace AtlasRPG.Web.Controllers
                     .ThenInclude(e => e.Weapon)
                     .ThenInclude(w => w!.Item)
                     .ThenInclude(i => i.Affixes)
+                    .ThenInclude(a => a.AffixDefinition)
                 .Include(r => r.Equipment)
                     .ThenInclude(e => e.Armor)
+                    .ThenInclude(a => a!.Item)
+                    .ThenInclude(i => i.Affixes)
+                    .ThenInclude(a => a.AffixDefinition)
                 .Include(r => r.Equipment)
                     .ThenInclude(e => e.Belt)
+                    .ThenInclude(b => b!.Item)
+                    .ThenInclude(i => i.Affixes)
+                    .ThenInclude(a => a.AffixDefinition)
+                .Include(r => r.Equipment)
+                    .ThenInclude(e => e.Offhand)
+                    .ThenInclude(o => o!.Item)
+                    .ThenInclude (i => i.Affixes)
+                    .ThenInclude(a => a.AffixDefinition)
+                .Include(r => r.AllocatedPassives)  // ← ekle
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
 
@@ -125,6 +145,42 @@ namespace AtlasRPG.Web.Controllers
                     .ToListAsync();
             }
 
+            var shopItems = await _shopService.GenerateShopInventory(run.CurrentTurn);
+            foreach (var si in shopItems)
+            {
+                await _context.Entry(si)
+                    .Collection(i => i.Affixes)
+                    .Query()
+                    .Include(a => a.AffixDefinition)
+                    .LoadAsync();
+            }
+            ViewBag.ShopItems = shopItems;
+            ViewBag.ShopPrices = shopItems.ToDictionary(i => i.Id, i => _shopService.CalculateItemPrice(i));
+
+            // ── Stats hesapla ────────────────────────────────────────────────
+            var baseStat = await _context.BaseStatDefinitions
+                .FirstOrDefaultAsync(b => b.Race == run.Race);
+
+            CharacterStats calculatedStats = new();
+
+            if (baseStat != null)
+            {
+                var allocatedIds = run.AllocatedPassives?
+                    .Select(p => p.NodeId).ToList() ?? new List<string>();
+
+                var allocatedDefs = (await _context.PassiveNodeDefinitions.ToListAsync())
+                    .Where(nd => allocatedIds.Contains(nd.NodeId))
+                    .ToList();
+
+                calculatedStats = _statCalculator.CalculateRunStats(run, baseStat, allocatedDefs);
+            }
+
+            var lastSkillId = run.Turns
+                .Where(t => t.IsCompleted && t.SelectedActiveSkillId.HasValue)
+                .OrderByDescending(t => t.TurnNumber)
+                .FirstOrDefault()
+                ?.SelectedActiveSkillId;
+
             var viewModel = new TurnHubViewModel
             {
                 Run = run,
@@ -132,7 +188,8 @@ namespace AtlasRPG.Web.Controllers
                 Equipment = run.Equipment,
                 AvailableSkills = availableSkills,
                 Inventory = run.Inventory.ToList(),
-
+                LastSelectedSkillId = lastSkillId,   // ← YENİ
+                Stats = calculatedStats,
             };
 
             return View(viewModel);
