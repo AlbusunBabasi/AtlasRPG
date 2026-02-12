@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Web/Controllers/ShopController.cs
+// AtlasRPG.Web/Controllers/ShopController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AtlasRPG.Application.Services;
@@ -67,7 +67,7 @@ namespace AtlasRPG.Web.Controllers
                 ? "Item purchased successfully!"
                 : "Not enough gold!";
 
-            return RedirectToAction("Index", new { runId });
+            return RedirectToAction("TurnHub", "Run", new { id = runId });
         }
 
         [HttpPost]
@@ -80,7 +80,7 @@ namespace AtlasRPG.Web.Controllers
                 ? "Item sold!"
                 : "Cannot sell equipped item.";
 
-            return RedirectToAction("Index", new { runId });
+            return RedirectToAction("TurnHub", "Run", new { id = runId });
         }
 
         [HttpPost]
