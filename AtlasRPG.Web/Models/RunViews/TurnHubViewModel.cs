@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Web/Models/Run/TurnHubViewModel.cs
+// AtlasRPG.Web/Models/Run/TurnHubViewModel.cs
 using AtlasRPG.Core.Entities.Runs;
 using AtlasRPG.Core.Entities.Items;
 using AtlasRPG.Core.Entities.GameData;
@@ -36,5 +36,10 @@ namespace AtlasRPG.Web.Models.RunViews
         public decimal ChaosResist => Stats.ChaosResist;
         public decimal CritMult => Stats.CritMultiplier;
         public decimal ArmorPen => Stats.ArmorPenetration;
+
+        public Guid? LastSelectedSkillId { get; set; }
+        public List<AtlasRPG.Core.Entities.Items.Item> ShopItems { get; set; } = new();
+        public Dictionary<Guid, int> ShopPrices { get; set; } = new();
+
     }
 }
