@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Web/Controllers/InventoryController.cs
+// AtlasRPG.Web/Controllers/InventoryController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AtlasRPG.Application.Services;
@@ -55,7 +55,7 @@ namespace AtlasRPG.Web.Controllers
             else
                 TempData["Error"] = "Failed to equip item";
 
-            return RedirectToAction("Index", new { runId });
+            return RedirectToAction("TurnHub", "Run", new { id = runId });
         }
 
         // POST: /Inventory/Unequip
@@ -70,7 +70,7 @@ namespace AtlasRPG.Web.Controllers
             else
                 TempData["Error"] = "Failed to unequip item";
 
-            return RedirectToAction("Index", new { runId });
+            return RedirectToAction("TurnHub", "Run", new { id = runId });
         }
 
         // GET: /Inventory/StatPreview (AJAX)
