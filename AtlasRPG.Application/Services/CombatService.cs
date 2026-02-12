@@ -113,6 +113,8 @@ namespace AtlasRPG.Application.Services
                 playerStats.CurrentHp -= playerDotDamage;
                 opponentStats.CurrentHp -= opponentDotDamage;
 
+                round.EventLog = $"{(double)playerDotDamage:F1}|{(double)opponentDotDamage:F1}";
+
                 if (playerStats.CurrentHp <= 0 || opponentStats.CurrentHp <= 0)
                 {
                     round.PlayerHpRemaining = playerStats.CurrentHp;
