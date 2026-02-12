@@ -1,454 +1,951 @@
-﻿@* AtlasRPG.Web/Views/Run/PassiveTree.cshtml *@
+@* AtlasRPG.Web/Views/Run/PassiveTree.cshtml — FULL REPLACEMENT *@
 @model AtlasRPG.Web.Models.RunViews.PassiveTreeViewModel
-
+@using System.Text.Json
 @{
     ViewData["Title"] = "Passive Tree";
 
-    // ── Path Definitions ─────────────────────────────────────────
-    // NodeId sıra numarasına göre hangi path'e düştüğünü belirler
-    static int NodeNum(string nodeId) =>
-        int.TryParse(nodeId.TrimStart('N'), out int n) ? n : 0;
-
-    var pathDefs = new[]
+    // Serialize nodes for JS
+    var nodesJson = JsonSerializer.Serialize(Model.Nodes.Select(n => new
     {
-        new { Id = "core",      Label = "⭕ Core",        From = 1,  To = 1  },
-        new { Id = "offense",   Label = "⚔️ Offense",     From = 2,  To = 7  },
-        new { Id = "defense",   Label = "🛡️ Defense",     From = 8,  To = 13 },
-        new { Id = "utility",   Label = "⚡ Utility",     From = 14, To = 19 },
-        new { Id = "bow",       Label = "🏹 Bow",         From = 20, To = 26 },
-        new { Id = "dagger",    Label = "🗡️ Dagger",      From = 27, To = 33 },
-        new { Id = "sword1h",   Label = "⚔️ 1H Sword",    From = 34, To = 40 },
-        new { Id = "twohands",  Label = "⚔️ 2H Sword",   From = 41, To = 47 },
-        new { Id = "wand",      Label = "🪄 Wand",        From = 48, To = 54 },
-        new { Id = "staff",     Label = "🔮 Staff",       From = 55, To = 60 },
-    };
-
-    string NodeTypeBadgeClass(string nt) => nt switch
-    {
-        "Notable" => "bg-primary",
-        "Keystone" => "bg-warning text-dark",
-        _ => "bg-secondary"
-    };
-
-    string NodeTypeBorderClass(string nt) => nt switch
-    {
-        "Notable" => "node-notable",
-        "Keystone" => "node-keystone",
-        _ => "node-minor"
-    };
+        nodeId = n.NodeId,
+        displayName = n.DisplayName,
+        nodeType = n.NodeType,
+        description = n.Description,
+        requiredLevel = n.RequiredLevel,
+        prereqs = n.PrerequisiteNodeIds,
+        effectJson = n.EffectJson,
+        isAllocated = n.IsAllocated,
+        isAllocatable = n.IsAllocatable
+    }));
 }
 
-<div class="container-fluid mt-3 px-3">
-
-    @* ── Header Bar ─────────────────────────────────────────────── *@
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h4 class="mb-0">🌳 Passive Tree</h4>
-            <small class="text-muted">Level @Model.CurrentLevel</small>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-            <span class="badge bg-info fs-6 px-3 py-2">
-                💎 @Model.AvailablePoints point@(Model.AvailablePoints != 1 ? "s" : "") remaining
-            </span>
-            <form asp-action="ResetPassiveTree" method="post" class="d-inline"
-                  onsubmit="return confirm('Reset all passives? Points will be refunded.');">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="runId" value="@Model.RunId" />
-                <button type="submit" class="btn btn-outline-danger btn-sm">
-                    🔄 Reset Tree
-                </button>
-            </form>
-            <a asp-action="TurnHub" asp-route-id="@Model.RunId" class="btn btn-outline-secondary btn-sm">
-                ← Back to Hub
-            </a>
-        </div>
-    </div>
-
-    @* ── Alerts ──────────────────────────────────────────────────── *@
-    @if (TempData["Success"] != null)
-    {
-        <div class="alert alert-success alert-dismissible fade show py-2" role="alert">
-            @TempData["Success"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
-    @if (TempData["Error"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show py-2" role="alert">
-            @TempData["Error"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
-    @if (TempData["Info"] != null)
-    {
-        <div class="alert alert-info alert-dismissible fade show py-2" role="alert">
-            @TempData["Info"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
-
-    @* ── Summary Pills ───────────────────────────────────────────── *@
-    <div class="d-flex gap-2 flex-wrap mb-3">
-        @{
-            int totalAllocated = Model.AllocatedNodeIds.Count;
-            int totalMinor = Model.Nodes.Count(n => n.IsAllocated && n.NodeType == "Minor");
-            int totalNotable = Model.Nodes.Count(n => n.IsAllocated && n.NodeType == "Notable");
-            int totalKeystone = Model.Nodes.Count(n => n.IsAllocated && n.NodeType == "Keystone");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Passive Tree — AtlasRPG</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #060610;
+            --surf1: #0a0a18;
+            --surf2: #0e0e20;
+            --border: rgba(255,255,255,.07);
+            --cp: #4a9eff;
+            --cg: #f0c060;
+            --ce: #ff4545;
+            --fd: 'Cinzel',serif;
+            --fu: 'Rajdhani',sans-serif;
         }
-        <span class="badge bg-dark">📊 Allocated: @totalAllocated</span>
-        <span class="badge bg-secondary">Minor: @totalMinor</span>
-        <span class="badge bg-primary">Notable: @totalNotable</span>
-        <span class="badge bg-warning text-dark">Keystone: @totalKeystone</span>
-    </div>
 
-    @* ── Path Tabs ───────────────────────────────────────────────── *@
-    <ul class="nav nav-tabs mb-3" id="pathTabs" role="tablist">
-        @for (int i = 0; i < pathDefs.Length; i++)
-        {
-            var path = pathDefs[i];
-            var nodesInPath = Model.Nodes.Where(n => NodeNum(n.NodeId) >= path.From && NodeNum(n.NodeId) <= path.To).ToList();
-            int allocCount = nodesInPath.Count(n => n.IsAllocated);
-            int availCount = nodesInPath.Count(n => n.IsAllocatable);
-            <li class="nav-item" role="presentation">
-                <button class="nav-link @(i == 0 ? "active" : "")"
-                        id="tab-@path.Id"
-                        data-bs-toggle="tab"
-                        data-bs-target="#pane-@path.Id"
-                        type="button" role="tab">
-                    @path.Label
-                    @if (allocCount > 0)
-                    {
-                        <span class="badge bg-warning text-dark ms-1">@allocCount</span>
-                    }
-                    @if (availCount > 0)
-                    {
-                        <span class="badge bg-success ms-1">@availCount</span>
-                    }
-                </button>
-            </li>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-    </ul>
 
-    @* ── Tab Panes ───────────────────────────────────────────────── *@
-    <div class="tab-content" id="pathTabContent">
-        @for (int i = 0; i < pathDefs.Length; i++)
-        {
-            var path = pathDefs[i];
-            var nodesInPath = Model.Nodes
-            .Where(n => NodeNum(n.NodeId) >= path.From && NodeNum(n.NodeId) <= path.To)
-            .OrderBy(n => NodeNum(n.NodeId))
-            .ToList();
+        html, body {
+            background: var(--bg);
+            color: #c8c8d8;
+            font-family: var(--fu);
+            height: 100%;
+            overflow: hidden;
+        }
 
-            <div class="tab-pane fade @(i == 0 ? "show active" : "")"
-                 id="pane-@path.Id" role="tabpanel">
+        /* ── TOP BAR ── */
+        #topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: rgba(6,6,16,.92);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border);
+            padding: .5rem 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
 
-                @if (!nodesInPath.Any())
-                {
-                    <p class="text-muted">No nodes in this path.</p>
+        .tb-title {
+            font-family: var(--fd);
+            font-size: .8rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(220,220,240,.5);
+        }
+
+        .pts-badge {
+            padding: .3rem .9rem;
+            border-radius: 20px;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: rgba(240,192,96,.13);
+            border: 1px solid rgba(240,192,96,.3);
+            color: var(--cg);
+        }
+
+            .pts-badge.zero {
+                opacity: .35;
+            }
+
+        .tb-btn {
+            padding: .28rem .85rem;
+            border-radius: 7px;
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            border: 1px solid;
+            transition: all .15s;
+            cursor: pointer;
+            font-family: var(--fu);
+        }
+
+            .tb-btn.back {
+                border-color: rgba(74,158,255,.25);
+                color: rgba(74,158,255,.7);
+                background: rgba(74,158,255,.06);
+            }
+
+                .tb-btn.back:hover {
+                    border-color: var(--cp);
+                    color: var(--cp);
+                    background: rgba(74,158,255,.12);
                 }
-                else
-                {
-                    @* Node chain with arrows *@
-                    <div class="node-chain d-flex align-items-start flex-wrap gap-0">
-                        @for (int j = 0; j < nodesInPath.Count; j++)
-                        {
-                            var node = nodesInPath[j];
 
-                            @* Arrow between nodes *@
-                            @if (j > 0)
-                            {
-                                <div class="node-arrow">→</div>
-                            }
+            .tb-btn.reset {
+                border-color: rgba(255,80,80,.2);
+                color: rgba(255,80,80,.55);
+                background: rgba(255,80,80,.05);
+            }
 
-                            @* Node Card *@
-                            <div class="node-card @NodeTypeBorderClass(node.NodeType) @(node.IsAllocated ? "node-allocated" : "") @(node.IsAllocatable ? "node-available" : "") @(!node.IsAllocated && !node.IsAllocatable ? "node-locked" : "")"
-                                 data-bs-toggle="tooltip"
-                                 data-bs-placement="top"
-                                 title="@node.Description | Req Lv @node.RequiredLevel">
-
-                                @* Type badge *@
-                                <span class="badge @NodeTypeBadgeClass(node.NodeType) node-type-badge">
-                                    @node.NodeType
-                                </span>
-
-                                @* Node ID *@
-                                <div class="node-id">@node.NodeId</div>
-
-                                @* Name *@
-                                <div class="node-name">@node.DisplayName</div>
-
-                                @* Status icon *@
-                                <div class="node-status">
-                                    @if (node.IsAllocated)
-                                    {
-                                        <span class="text-warning">✓ Taken</span>
-                                    }
-                                    else if (node.IsAllocatable)
-                                    {
-                                        <span class="text-success">● Available</span>
-                                    }
-                                    else if (Model.CurrentLevel < node.RequiredLevel)
-                                    {
-                                        <span class="text-danger">Lv @node.RequiredLevel</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">🔒 Locked</span>
-                                    }
-                                </div>
-
-                                @* Allocate Button *@
-                                @if (node.IsAllocatable)
-                                {
-                                    <form asp-action="AllocateNode" method="post" class="mt-1">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="runId" value="@Model.RunId" />
-                                        <input type="hidden" name="nodeId" value="@node.NodeId" />
-                                        <button type="submit" class="btn btn-success btn-sm w-100">
-                                            + Allocate
-                                        </button>
-                                    </form>
-                                }
-                            </div>
-                        }
-                    </div>
-
-                    @* ── Node Detail Accordion ──────────────────────────── *@
-                    <div class="accordion mt-3" id="acc-@path.Id">
-                        <div class="accordion-item bg-dark border-secondary">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed bg-dark text-light py-2" type="button"
-                                        data-bs-toggle="collapse" data-bs-target="#detail-@path.Id">
-                                    📋 Node Details
-                                </button>
-                            </h2>
-                            <div id="detail-@path.Id" class="accordion-collapse collapse">
-                                <div class="accordion-body p-2">
-                                    <div class="table-responsive">
-                                        <table class="table table-dark table-sm table-bordered mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width:55px">Node</th>
-                                                    <th>Name</th>
-                                                    <th>Type</th>
-                                                    <th>Req Lv</th>
-                                                    <th>Status</th>
-                                                    <th>Effect</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach (var node in nodesInPath)
-                                                {
-                                                    <tr class="@(node.IsAllocated ? "table-warning" : node.IsAllocatable ? "table-success" : "")">
-                                                        <td><code>@node.NodeId</code></td>
-                                                        <td>@node.DisplayName</td>
-                                                        <td>
-                                                            <span class="badge @NodeTypeBadgeClass(node.NodeType)">
-                                                                @node.NodeType
-                                                            </span>
-                                                        </td>
-                                                        <td>@node.RequiredLevel</td>
-                                                        <td>
-                                                            @if (node.IsAllocated)
-                                                            {
-                                                                <text>✅ Taken</text>
-                                                            }
-                                                            else if (node.IsAllocatable)
-                                                            {
-                                                                <text>🟢 Available</text>
-                                                            }
-                                                            else
-                                                            {
-                                                                <text>🔒 Locked</text>
-                                                            }
-                                                        </td>
-                                                        <td><small class="text-muted">@node.Description</small></td>
-                                                    </tr>
-                                                }
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                .tb-btn.reset:hover {
+                    border-color: var(--ce);
+                    color: var(--ce);
+                    background: rgba(255,80,80,.1);
                 }
-            </div>
+
+        .notif {
+            padding: .25rem .8rem;
+            border-radius: 6px;
+            font-size: .72rem;
+            font-weight: 600;
         }
+
+            .notif.ok {
+                background: rgba(60,200,100,.1);
+                border: 1px solid rgba(60,200,100,.22);
+                color: #70e090;
+            }
+
+            .notif.err {
+                background: rgba(255,80,80,.1);
+                border: 1px solid rgba(255,80,80,.22);
+                color: #ff8080;
+            }
+
+        .tb-legend {
+            display: flex;
+            gap: .6rem;
+            align-items: center;
+            margin-left: auto;
+        }
+
+        .leg {
+            display: flex;
+            align-items: center;
+            gap: .3rem;
+            font-size: .68rem;
+            color: rgba(180,180,200,.4);
+        }
+
+        .leg-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+
+            .leg-dot.minor {
+                border-color: rgba(150,150,170,.5);
+                background: rgba(150,150,170,.15);
+            }
+
+            .leg-dot.notable {
+                border-color: rgba(80,144,255,.7);
+                background: rgba(80,144,255,.2);
+            }
+
+            .leg-dot.keystone {
+                border-color: rgba(240,192,96,.8);
+                background: rgba(240,192,96,.25);
+            }
+
+            .leg-dot.allocated {
+                border-color: rgba(255,255,255,.6);
+                background: rgba(255,255,255,.25);
+            }
+
+        /* ── CANVAS ── */
+        #tree-wrap {
+            position: fixed;
+            top: 44px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: auto;
+            cursor: grab;
+        }
+
+            #tree-wrap:active {
+                cursor: grabbing;
+            }
+
+        #tree-canvas {
+            position: relative;
+            width: 2400px;
+            height: 1600px;
+        }
+
+        /* ── CONNECTIONS SVG ── */
+        #connections {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .conn {
+            stroke: rgba(255,255,255,.06);
+            stroke-width: 2;
+            fill: none;
+        }
+
+            .conn.c-allocated {
+                stroke: rgba(255,255,255,.25);
+                stroke-width: 2.5;
+            }
+
+            .conn.c-available {
+                stroke: rgba(74,158,255,.2);
+                stroke-width: 2;
+            }
+
+        /* ── NODE ── */
+        .pnode {
+            position: absolute;
+            transform: translate(-50%,-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            transition: transform .15s;
+            z-index: 10;
+        }
+
+            .pnode:hover {
+                transform: translate(-50%,-50%) scale(1.12);
+            }
+
+        .nd-circle {
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all .18s;
+            border-style: solid;
+        }
+            /* sizes */
+            .nd-circle.minor {
+                width: 46px;
+                height: 46px;
+                border-width: 2px;
+            }
+
+            .nd-circle.notable {
+                width: 58px;
+                height: 58px;
+                border-width: 2.5px;
+            }
+
+            .nd-circle.keystone {
+                width: 72px;
+                height: 72px;
+                border-width: 3px;
+                border-radius: 4px;
+                transform: rotate(45deg);
+            }
+
+                .nd-circle.keystone .nd-inner {
+                    transform: rotate(-45deg);
+                }
+
+        /* states */
+        .pnode.locked .nd-circle {
+            border-color: rgba(80,80,100,.3);
+            background: rgba(20,20,35,.8);
+        }
+
+        .pnode.locked .nd-img {
+            filter: brightness(0) invert(1) opacity(.12);
+        }
+
+        .pnode.locked .nd-label {
+            color: rgba(120,120,140,.35);
+        }
+
+        .pnode.available .nd-circle.minor {
+            border-color: rgba(74,158,255,.35);
+            background: rgba(74,158,255,.06);
+        }
+
+        .pnode.available .nd-circle.notable {
+            border-color: rgba(74,158,255,.5);
+            background: rgba(74,158,255,.1);
+        }
+
+        .pnode.available .nd-circle.keystone {
+            border-color: rgba(240,192,96,.45);
+            background: rgba(240,192,96,.07);
+        }
+
+        .pnode.available .nd-img {
+            filter: brightness(0) invert(1) opacity(.4);
+        }
+
+        .pnode.available .nd-label {
+            color: rgba(160,180,220,.6);
+        }
+
+        .pnode.available:hover .nd-circle {
+            box-shadow: 0 0 16px rgba(74,158,255,.25);
+        }
+
+        .pnode.allocated .nd-circle.minor {
+            border-color: rgba(200,210,255,.7);
+            background: rgba(74,158,255,.22);
+        }
+
+        .pnode.allocated .nd-circle.notable {
+            border-color: rgba(80,150,255,.9);
+            background: rgba(80,150,255,.28);
+        }
+
+        .pnode.allocated .nd-circle.keystone {
+            border-color: rgba(240,192,96,.95);
+            background: rgba(240,192,96,.22);
+        }
+
+        .pnode.allocated .nd-img {
+            filter: brightness(0) invert(1) opacity(.85);
+        }
+
+        .pnode.allocated .nd-label {
+            color: rgba(220,225,255,.9);
+        }
+
+        .pnode.allocated .nd-circle {
+            box-shadow: 0 0 12px rgba(74,158,255,.18);
+        }
+
+            .pnode.allocated .nd-circle.keystone {
+                box-shadow: 0 0 18px rgba(240,192,96,.25);
+            }
+
+        .nd-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        .nd-img {
+            width: 55%;
+            height: 55%;
+            object-fit: contain;
+        }
+
+        .nd-fallback {
+            font-size: 1.1rem;
+            display: none;
+        }
+
+        .nd-img.broken {
+            display: none;
+        }
+
+            .nd-img.broken ~ .nd-fallback {
+                display: block;
+            }
+
+        .nd-label {
+            margin-top: 5px;
+            font-size: .6rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            text-align: center;
+            max-width: 90px;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nd-allocated-check {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #4a9eff;
+            border: 2px solid var(--bg);
+            font-size: .55rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 900;
+        }
+
+        /* ── TOOLTIP ── */
+        #tooltip {
+            position: fixed;
+            z-index: 999;
+            pointer-events: none;
+            background: rgba(8,8,20,.97);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 9px;
+            padding: .75rem 1rem;
+            max-width: 260px;
+            display: none;
+            box-shadow: 0 8px 30px rgba(0,0,0,.6);
+        }
+
+        .tt-name {
+            font-family: var(--fd);
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            margin-bottom: .3rem;
+        }
+
+            .tt-name.minor {
+                color: rgba(200,205,230,.85);
+            }
+
+            .tt-name.notable {
+                color: var(--cp);
+            }
+
+            .tt-name.keystone {
+                color: var(--cg);
+            }
+
+        .tt-type {
+            font-size: .62rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(160,160,180,.4);
+            margin-bottom: .45rem;
+        }
+
+        .tt-desc {
+            font-size: .73rem;
+            color: rgba(180,185,210,.8);
+            line-height: 1.5;
+            margin-bottom: .4rem;
+        }
+
+        .tt-req {
+            font-size: .65rem;
+            color: rgba(150,150,170,.5);
+        }
+
+        .tt-state {
+            font-size: .65rem;
+            font-weight: 700;
+            margin-top: .35rem;
+            padding: .2rem .5rem;
+            border-radius: 5px;
+            display: inline-block;
+        }
+
+            .tt-state.allocated {
+                background: rgba(60,200,100,.12);
+                color: #70e090;
+                border: 1px solid rgba(60,200,100,.2);
+            }
+
+            .tt-state.available {
+                background: rgba(74,158,255,.12);
+                color: var(--cp);
+                border: 1px solid rgba(74,158,255,.2);
+            }
+
+            .tt-state.locked {
+                background: rgba(100,100,120,.1);
+                color: rgba(150,150,170,.5);
+                border: 1px solid rgba(100,100,120,.15);
+            }
+
+        /* ── PATH LABELS ── */
+        .path-label {
+            position: absolute;
+            transform: translate(-50%,-50%);
+            font-family: var(--fd);
+            font-size: .6rem;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: rgba(180,180,200,.15);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* ── CENTER NODE ── */
+        .pnode.center .nd-circle {
+            border-color: rgba(240,192,96,.6);
+            background: rgba(240,192,96,.12);
+            box-shadow: 0 0 30px rgba(240,192,96,.12);
+        }
+
+        .pnode.center .nd-img {
+            filter: brightness(0) saturate(100%) invert(80%) sepia(50%) saturate(500%) hue-rotate(5deg) opacity(0.9);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <div id="topbar">
+        <div class="tb-title">🌳 Passive Tree</div>
+
+        @if (TempData["Success"] != null)
+        {
+            <div class="notif ok">✓ @TempData["Success"]</div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="notif err">✕ @TempData["Error"]</div>
+        }
+
+        <div class="pts-badge @(Model.AvailablePoints == 0 ? "zero" : "")">
+            💎 @Model.AvailablePoints point@(Model.AvailablePoints != 1 ? "s" : "") — Level @Model.CurrentLevel
+        </div>
+
+        <a href="/Run/TurnHub/@Model.RunId" class="tb-btn back">← Back to Hub</a>
+
+        <form action="/Run/ResetPassiveTree" method="post" style="display:inline"
+              onsubmit="return confirm('Reset all passive nodes? Points will be refunded.')">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="runId" value="@Model.RunId" />
+            <button type="submit" class="tb-btn reset">↺ Reset Tree</button>
+        </form>
+
+        <div class="tb-legend">
+            <div class="leg"><div class="leg-dot minor"></div>Minor</div>
+            <div class="leg"><div class="leg-dot notable"></div>Notable</div>
+            <div class="leg"><div class="leg-dot keystone"></div>Keystone</div>
+            <div class="leg"><div class="leg-dot allocated"></div>Allocated</div>
+        </div>
     </div>
 
-    @* ── Legend ─────────────────────────────────────────────────── *@
-    <div class="d-flex gap-3 mt-4 flex-wrap">
-        <span class="legend-item node-allocated">✓ Allocated</span>
-        <span class="legend-item node-available">● Available</span>
-        <span class="legend-item node-locked">🔒 Locked</span>
-        <span class="legend-item"><span class="badge bg-secondary">Minor</span></span>
-        <span class="legend-item"><span class="badge bg-primary">Notable</span></span>
-        <span class="legend-item"><span class="badge bg-warning text-dark">Keystone</span></span>
+    <!-- TREE CANVAS -->
+    <div id="tree-wrap">
+        <div id="tree-canvas">
+            <svg id="connections"></svg>
+            <!-- nodes injected by JS -->
+        </div>
     </div>
 
-</div>
+    <!-- TOOLTIP -->
+    <div id="tooltip">
+        <div class="tt-name" id="tt-name"></div>
+        <div class="tt-type" id="tt-type"></div>
+        <div class="tt-desc" id="tt-desc"></div>
+        <div class="tt-req" id="tt-req"></div>
+        <div id="tt-state-wrap"></div>
+    </div>
 
-@* ─────────────────────────────────────────────────────────────── *@
-@section Scripts {
+    <!-- ALLOC FORM (hidden, submitted by JS) -->
+    <form id="allocForm" action="/Run/AllocateNode" method="post" style="display:none">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="runId" value="@Model.RunId" />
+        <input type="hidden" name="nodeId" id="allocNodeId" />
+    </form>
+
     <script>
-        // Bootstrap tooltips
-        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-            new bootstrap.Tooltip(el, { trigger: 'hover' });
+        // ═══════════════════════════════════════════════════════
+        // DATA
+        // ═══════════════════════════════════════════════════════
+        const NODES = @Html.Raw(nodesJson);
+        const nodeMap = {};
+        NODES.forEach(n => nodeMap[n.nodeId] = n);
+
+        // ═══════════════════════════════════════════════════════
+        // ICON MAPPING
+        // Node'un EffectJson içeriğine göre icon path döner.
+        // Dosyaları wwwroot/images/passives/ klasörüne koy.
+        // ═══════════════════════════════════════════════════════
+        function getNodeIcon(node) {
+          const e = node.effectJson.toLowerCase();
+          const id = node.nodeId;
+
+          // Keystone özel ikonlar
+          if (node.nodeType === 'Keystone') {
+            if (e.includes('crit'))      return '/images/passives/keystone-crit.svg';
+            if (e.includes('poison'))    return '/images/passives/keystone-poison.svg';
+            if (e.includes('burn'))      return '/images/passives/keystone-burn.svg';
+            if (e.includes('block'))     return '/images/passives/keystone-block.svg';
+            if (e.includes('evasion'))   return '/images/passives/keystone-evasion.svg';
+            if (e.includes('bleeding') || e.includes('bleed')) return '/images/passives/keystone-bleed.svg';
+            return '/images/passives/keystone-generic.svg';
+          }
+
+          // Notable özel ikonlar
+          if (node.nodeType === 'Notable') {
+            if (e.includes('accuracy'))  return '/images/passives/notable-accuracy.svg';
+            if (e.includes('crit'))      return '/images/passives/notable-crit.svg';
+            if (e.includes('mana'))      return '/images/passives/notable-mana.svg';
+            if (e.includes('cooldown'))  return '/images/passives/notable-cooldown.svg';
+            if (e.includes('block'))     return '/images/passives/notable-block.svg';
+            if (e.includes('bleed'))     return '/images/passives/notable-bleed.svg';
+            if (e.includes('burn'))      return '/images/passives/notable-burn.svg';
+            if (e.includes('initiative'))return '/images/passives/notable-initiative.svg';
+            return '/images/passives/notable-generic.svg';
+          }
+
+          // Minor nodes — effect type
+          if (e.includes('damage') && !e.includes('taken')) return '/images/passives/minor-damage.svg';
+          if (e.includes('armor'))     return '/images/passives/minor-armor.svg';
+          if (e.includes('evasion'))   return '/images/passives/minor-evasion.svg';
+          if (e.includes('critchance') || e.includes('critbonus')) return '/images/passives/minor-crit.svg';
+          if (e.includes('critmulti')) return '/images/passives/minor-critmulti.svg';
+          if (e.includes('maxhp') || e.includes('maxhppercent')) return '/images/passives/minor-hp.svg';
+          if (e.includes('maxmana') || e.includes('maxmanapercent')) return '/images/passives/minor-mana.svg';
+          if (e.includes('accuracy'))  return '/images/passives/minor-accuracy.svg';
+          if (e.includes('initiative')) return '/images/passives/minor-initiative.svg';
+          if (e.includes('ward'))      return '/images/passives/minor-ward.svg';
+          if (e.includes('block'))     return '/images/passives/minor-block.svg';
+          if (e.includes('bleed'))     return '/images/passives/minor-bleed.svg';
+          if (e.includes('burn'))      return '/images/passives/minor-burn.svg';
+          if (e.includes('poison'))    return '/images/passives/minor-poison.svg';
+
+          return '/images/passives/minor-generic.svg';
+        }
+
+        // Fallback emojiler (resim yoksa)
+        function getNodeEmoji(node) {
+          const e = node.effectJson.toLowerCase();
+          if (node.nodeType === 'Keystone') return '💎';
+          if (node.nodeType === 'Notable')  return '🔷';
+          if (e.includes('damage'))  return '⚔️';
+          if (e.includes('armor'))   return '🛡️';
+          if (e.includes('evasion')) return '💨';
+          if (e.includes('crit'))    return '💥';
+          if (e.includes('hp'))      return '❤️';
+          if (e.includes('mana'))    return '💧';
+          if (e.includes('accuracy'))return '🎯';
+          if (e.includes('initiative')) return '⚡';
+          if (e.includes('bleed'))   return '🩸';
+          if (e.includes('burn'))    return '🔥';
+          if (e.includes('poison'))  return '☠️';
+          return '✦';
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // LAYOUT — 9 radyal kol + N01 merkez
+        // Her kol: açı (derece), renk, nodeId listesi
+        // ═══════════════════════════════════════════════════════
+        const CX = 1200, CY = 800;
+        const STEP = 125; // node arası mesafe (px)
+
+        // arm def: angle (trigonometric: 0=right, +CCW), nodeIds in order (prereq chain)
+        // Branches: notables/keystones that fork off the main chain
+        const ARMS = [
+          // ── General paths ──
+          { label:'Offense',   angle: 0,   color:'#ff7060',
+            chain:['N02','N03','N04','N05','N06'],
+            branch:{from:'N04', nodes:['N07'], perpCCW:true} },
+
+          { label:'Defense',   angle: 40,  color:'#60a0ff',
+            chain:['N08','N09','N10','N11','N13'],
+            branch:{from:'N10', nodes:['N12'], perpCCW:false} },
+
+          { label:'Utility',   angle: 280, color:'#d0d030',
+            chain:['N14','N15','N16','N17','N19'],
+            branch:{from:'N16', nodes:['N18'], perpCCW:false} },
+
+          // ── Weapon paths ──
+          { label:'Bow',       angle: 90,  color:'#60d080',
+            chain:['N20','N21','N22','N23','N24'],
+            branch:{from:'N22', nodes:['N25','N26'], perpCCW:true} },
+
+          { label:'Dagger',    angle: 130, color:'#c060c0',
+            chain:['N27','N28','N29','N30','N31'],
+            branch:{from:'N29', nodes:['N32','N33'], perpCCW:true} },
+
+          { label:'1H Sword',  angle: 320, color:'#ff9040',
+            chain:['N34','N35','N36','N37','N38'],
+            branch:{from:'N37', nodes:['N39','N40'], perpCCW:false} },
+
+          { label:'2H Sword',  angle: 340, color:'#e0a030',
+            chain:['N41','N42','N43','N44','N45'],
+            branch:{from:'N43', nodes:['N46','N47'], perpCCW:true} },
+
+          { label:'Wand',      angle: 240, color:'#8060ff',
+            chain:['N48','N49','N50','N51','N52'],
+            branch:{from:'N50', nodes:['N53','N54'], perpCCW:false} },
+
+          { label:'Staff',     angle: 200, color:'#ff5050',
+            chain:['N55','N56','N57','N58','N59','N60'],
+            branch:null },
+        ];
+
+        // Compute positions
+        const POS = { N01: [CX, CY] };  // center
+
+        function toRad(deg) { return deg * Math.PI / 180; }
+
+        ARMS.forEach(arm => {
+          const rad = toRad(arm.angle);
+          const dx = Math.cos(rad);
+          const dy = -Math.sin(rad); // SVG y-axis inverted
+
+          arm.chain.forEach((nid, i) => {
+            POS[nid] = [
+              CX + (i + 1) * STEP * dx,
+              CY + (i + 1) * STEP * dy
+            ];
+          });
+
+          if (arm.branch) {
+            const {from, nodes: bnodes, perpCCW} = arm.branch;
+            const [bx, by] = POS[from];
+            // Perpendicular direction
+            const px = perpCCW ? dy : -dy;
+            const py = perpCCW ? -dx : dx;
+            bnodes.forEach((nid, i) => {
+              POS[nid] = [
+                bx + (i + 1) * STEP * px,
+                by + (i + 1) * STEP * py
+              ];
+            });
+          }
         });
+
+        // ═══════════════════════════════════════════════════════
+        // RENDER
+        // ═══════════════════════════════════════════════════════
+        const canvas  = document.getElementById('tree-canvas');
+        const svgEl   = document.getElementById('connections');
+
+        // Set SVG size
+        svgEl.setAttribute('viewBox', `0 0 2400 1600`);
+
+        // Draw connection lines
+        function drawConnections() {
+          svgEl.innerHTML = '';
+
+          NODES.forEach(node => {
+            if (!node.prereqs) return;
+            node.prereqs.forEach(prereqId => {
+              if (!POS[node.nodeId] || !POS[prereqId]) return;
+              const [x1,y1] = POS[prereqId];
+              const [x2,y2] = POS[node.nodeId];
+
+              const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+              line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+              line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+
+              let cls = 'conn';
+              const prereqNode = nodeMap[prereqId];
+              if (node.isAllocated && prereqNode?.isAllocated) cls += ' c-allocated';
+              else if (node.isAllocatable) cls += ' c-available';
+
+              line.setAttribute('class', cls);
+              svgEl.appendChild(line);
+            });
+          });
+        }
+
+        // Draw path labels
+        function drawPathLabels() {
+          ARMS.forEach(arm => {
+            const rad = toRad(arm.angle);
+            const dx = Math.cos(rad), dy = -Math.sin(rad);
+            const labelDist = (arm.chain.length + 1.4) * STEP;
+            const lx = CX + labelDist * dx;
+            const ly = CY + labelDist * dy;
+
+            const el = document.createElement('div');
+            el.className = 'path-label';
+            el.style.left = lx + 'px';
+            el.style.top  = ly + 'px';
+            el.style.color = arm.color.replace(')', ',.18)').replace('rgb', 'rgba').replace('#', '').length < 10
+              ? arm.color + '44' : arm.color;
+            // simpler: just set opacity
+            el.style.color = arm.color;
+            el.style.opacity = '.25';
+            el.textContent = arm.label;
+            canvas.appendChild(el);
+          });
+        }
+
+        // Draw nodes
+        function drawNodes() {
+          NODES.forEach(node => {
+            const pos = POS[node.nodeId];
+            if (!pos) return;
+
+            const state = node.isAllocated ? 'allocated' : node.isAllocatable ? 'available' : 'locked';
+            const typeL = node.nodeType.toLowerCase();
+
+            const wrap = document.createElement('div');
+            wrap.className = `pnode ${state} ${node.nodeId === 'N01' ? 'center' : ''}`;
+            wrap.style.left = pos[0] + 'px';
+            wrap.style.top  = pos[1] + 'px';
+            wrap.dataset.nodeId = node.nodeId;
+
+            // Circle
+            const circle = document.createElement('div');
+            circle.className = `nd-circle ${typeL}`;
+
+            const inner = document.createElement('div');
+            inner.className = 'nd-inner';
+
+            const img = document.createElement('img');
+            img.className = 'nd-img';
+            img.src = getNodeIcon(node);
+            img.alt = node.displayName;
+            img.onerror = function() { this.classList.add('broken'); };
+
+            const fallback = document.createElement('span');
+            fallback.className = 'nd-fallback';
+            fallback.textContent = getNodeEmoji(node);
+
+            inner.appendChild(img);
+            inner.appendChild(fallback);
+            circle.appendChild(inner);
+
+            // Allocated checkmark
+            if (node.isAllocated) {
+              const check = document.createElement('div');
+              check.className = 'nd-allocated-check';
+              check.textContent = '✓';
+              circle.appendChild(check);
+            }
+
+            // Label
+            const label = document.createElement('div');
+            label.className = 'nd-label';
+            label.textContent = node.displayName;
+
+            wrap.appendChild(circle);
+            wrap.appendChild(label);
+            canvas.appendChild(wrap);
+
+            // Events
+            wrap.addEventListener('mouseenter', e => showTooltip(e, node));
+            wrap.addEventListener('mousemove',  e => moveTooltip(e));
+            wrap.addEventListener('mouseleave', hideTooltip);
+            if (node.isAllocatable) {
+              wrap.addEventListener('click', () => allocateNode(node.nodeId));
+            }
+          });
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // TOOLTIP
+        // ═══════════════════════════════════════════════════════
+        const tooltip = document.getElementById('tooltip');
+
+        function showTooltip(e, node) {
+          document.getElementById('tt-name').textContent  = node.displayName;
+          document.getElementById('tt-name').className    = 'tt-name ' + node.nodeType.toLowerCase();
+          document.getElementById('tt-type').textContent  = node.nodeType + ' · ' + node.nodeId;
+          document.getElementById('tt-desc').textContent  = node.description;
+          document.getElementById('tt-req').textContent   = node.requiredLevel > 1
+            ? 'Requires Level ' + node.requiredLevel : '';
+
+          const sw = document.getElementById('tt-state-wrap');
+          const state = node.isAllocated ? 'allocated' : node.isAllocatable ? 'available' : 'locked';
+          const labels = { allocated:'✓ Allocated', available:'Click to allocate', locked:'Locked — requires prereq or level' };
+          sw.innerHTML = `<span class="tt-state ${state}">${labels[state]}</span>`;
+
+          tooltip.style.display = 'block';
+          moveTooltip(e);
+        }
+        function moveTooltip(e) {
+          const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+          let x = e.clientX + 16, y = e.clientY - 12;
+          if (x + tw > window.innerWidth  - 8) x = e.clientX - tw - 12;
+          if (y + th > window.innerHeight - 8) y = window.innerHeight - th - 8;
+          tooltip.style.left = x + 'px';
+          tooltip.style.top  = y + 'px';
+        }
+        function hideTooltip() { tooltip.style.display = 'none'; }
+
+        // ═══════════════════════════════════════════════════════
+        // ALLOCATE
+        // ═══════════════════════════════════════════════════════
+        function allocateNode(nodeId) {
+          hideTooltip();
+          document.getElementById('allocNodeId').value = nodeId;
+          document.getElementById('allocForm').submit();
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // DRAG TO PAN
+        // ═══════════════════════════════════════════════════════
+        const wrap = document.getElementById('tree-wrap');
+        let isDragging = false, startX, startY, scrollLeft, scrollTop;
+
+        wrap.addEventListener('mousedown', e => {
+          // Only pan if not clicking a node
+          if (e.target.closest('.pnode')) return;
+          isDragging = true;
+          startX = e.pageX - wrap.offsetLeft;
+          startY = e.pageY - wrap.offsetTop;
+          scrollLeft = wrap.scrollLeft;
+          scrollTop  = wrap.scrollTop;
+        });
+        wrap.addEventListener('mouseleave', () => isDragging = false);
+        wrap.addEventListener('mouseup',    () => isDragging = false);
+        wrap.addEventListener('mousemove', e => {
+          if (!isDragging) return;
+          e.preventDefault();
+          const x = e.pageX - wrap.offsetLeft;
+          const y = e.pageY - wrap.offsetTop;
+          wrap.scrollLeft = scrollLeft - (x - startX);
+          wrap.scrollTop  = scrollTop  - (y - startY);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // INIT — scroll to center
+        // ═══════════════════════════════════════════════════════
+        drawConnections();
+        drawPathLabels();
+        drawNodes();
+
+        // Scroll so N01 is visible center-screen
+        setTimeout(() => {
+          const tw = wrap.clientWidth, th = wrap.clientHeight;
+          wrap.scrollLeft = CX - tw / 2;
+          wrap.scrollTop  = CY - th / 2;
+        }, 60);
     </script>
-}
-
-@* ─────────────────────────────────────────────────────────────── *@
-<style>
-    /* ── Node Chain Layout ─────────────────────────────────────── */
-    .node-chain {
-        padding: 12px 0;
-        overflow-x: auto;
-        flex-wrap: nowrap !important;
-    }
-
-    .node-arrow {
-        display: flex;
-        align-items: center;
-        font-size: 1.4rem;
-        color: #555;
-        padding: 0 4px;
-        margin-top: 28px; /* align with node center */
-    }
-
-    /* ── Node Card Base ──────────────────────────────────────────── */
-    .node-card {
-        width: 110px;
-        min-height: 120px;
-        border-radius: 8px;
-        padding: 6px;
-        text-align: center;
-        border: 2px solid #444;
-        background: #1a1a2e;
-        position: relative;
-        transition: transform 0.1s, box-shadow 0.1s;
-        flex-shrink: 0;
-    }
-
-        .node-card:hover {
-            transform: translateY(-2px);
-        }
-
-    /* ── Node Types ─────────────────────────────────────────────── */
-    .node-minor {
-        border-color: #555;
-        background: #1c1c2e;
-    }
-
-    .node-notable {
-        border-color: #4169e1;
-        background: #1a1a3e;
-    }
-
-    .node-keystone {
-        border-color: #ffd700;
-        background: #2a1f00;
-    }
-
-    /* ── Node States ─────────────────────────────────────────────── */
-    .node-allocated {
-        border-color: #ffd700 !important;
-        background: #2a1f00 !important;
-        box-shadow: 0 0 8px rgba(255,215,0,0.3);
-    }
-
-    .node-available {
-        border-color: #28a745 !important;
-        background: #0d2018 !important;
-        box-shadow: 0 0 8px rgba(40,167,69,0.4);
-        cursor: pointer;
-    }
-
-        .node-available:hover {
-            box-shadow: 0 0 14px rgba(40,167,69,0.6);
-        }
-
-    .node-locked {
-        opacity: 0.45;
-    }
-
-    /* ── Node Inner Parts ───────────────────────────────────────── */
-    .node-type-badge {
-        font-size: 0.6rem;
-        position: absolute;
-        top: 4px;
-        right: 4px;
-    }
-
-    .node-id {
-        font-size: 0.65rem;
-        color: #666;
-        margin-bottom: 2px;
-    }
-
-    .node-name {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #ddd;
-        line-height: 1.2;
-        min-height: 30px;
-        margin-bottom: 4px;
-    }
-
-    .node-status {
-        font-size: 0.65rem;
-        margin-bottom: 4px;
-    }
-
-    /* ── Legend ─────────────────────────────────────────────────── */
-    .legend-item {
-        font-size: 0.8rem;
-        color: #aaa;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    /* ── Accordion override ─────────────────────────────────────── */
-    .accordion-button::after {
-        filter: invert(1);
-    }
-
-    /* ── Nav tabs dark theme ──────────────────────────────────────── */
-    .nav-tabs .nav-link {
-        color: #aaa;
-        border-color: #444;
-        font-size: 0.82rem;
-        padding: 6px 10px;
-    }
-
-        .nav-tabs .nav-link.active {
-            color: #fff;
-            background-color: #1a1a2e;
-            border-color: #4169e1 #4169e1 #1a1a2e;
-        }
-
-        .nav-tabs .nav-link:hover:not(.active) {
-            color: #fff;
-            border-color: #555;
-        }
-
-    .nav-tabs {
-        border-color: #444;
-    }
-
-    /* ── Scrollbar for node chain ────────────────────────────────── */
-    .node-chain::-webkit-scrollbar {
-        height: 6px;
-    }
-
-    .node-chain::-webkit-scrollbar-track {
-        background: #111;
-    }
-
-    .node-chain::-webkit-scrollbar-thumb {
-        background: #444;
-        border-radius: 3px;
-    }
-</style>
+</body>
+</html>
