@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+// AtlasRPG.Core/Entities/Items/Item.cs
 using AtlasRPG.Core.Enums;
 
 namespace AtlasRPG.Core.Entities.Items
@@ -12,14 +8,22 @@ namespace AtlasRPG.Core.Entities.Items
         public ItemSlot Slot { get; set; }
         public ItemRarity Rarity { get; set; }
         public int ItemLevel { get; set; }
-        public WeaponType? WeaponType { get; set; } // Null if not weapon
 
-        // Weapon Base Stats
+        // Weapon
+        public WeaponType? WeaponType { get; set; }
+
+        // Offhand subtype (null unless Slot == Offhand)
+        public OffhandType? OffhandType { get; set; }
+
+        // Armor subtype (null unless Slot == Armor)
+        public ArmorType? ArmorType { get; set; }
+
+        // ── Weapon Base Stats ──
         public decimal BaseAttackSpeed { get; set; } = 0;
         public decimal BaseDamage { get; set; } = 0;
         public decimal BaseCritChance { get; set; } = 0;
 
-        // Armor Base Stats
+        // ── Armor / Offhand Base Stats ──
         public decimal BaseArmor { get; set; } = 0;
         public decimal BaseEvasion { get; set; } = 0;
         public decimal BaseWard { get; set; } = 0;
