@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Application/Services/InventoryService.cs
+// AtlasRPG.Application/Services/InventoryService.cs
 using AtlasRPG.Core.Entities.Runs;
 using AtlasRPG.Core.Enums;
 using AtlasRPG.Infrastructure.Data;
@@ -40,6 +40,36 @@ namespace AtlasRPG.Application.Services
             }
 
             await UnequipSlot(runId, runItem.Item.Slot);
+
+            bool equippingOffhand = runItem.Item.Slot == ItemSlot.Offhand;
+            bool equippingWeapon = runItem.Item.Slot == ItemSlot.Weapon;
+
+            if (equippingOffhand)
+            {
+                // Mevcut weapon 2H mı?
+                var currentWeapon = equipment.Weapon?.Item;
+                bool weaponIs2H = currentWeapon?.WeaponType is WeaponType.TwoHandSword
+                               or WeaponType.Staff;
+                if (weaponIs2H)
+                    return false;  // 2H ile offhand takamazsın
+
+                // Offhand, quiver ise bow gereklidir
+                bool offhandIsQuiver = runItem.Item.OffhandType == OffhandType.Quiver;
+                bool weaponIsBow = currentWeapon?.WeaponType == WeaponType.Bow;
+                if (offhandIsQuiver && !weaponIsBow)
+                    return false;  // Quiver sadece bow ile
+            }
+
+            if (equippingWeapon)
+            {
+                bool newWeaponIs2H = runItem.Item.WeaponType is WeaponType.TwoHandSword
+                                  or WeaponType.Staff;
+                if (newWeaponIs2H)
+                {
+                    // 2H takılınca mevcut offhand'ı unequip et
+                    await UnequipSlot(runId, ItemSlot.Offhand);
+                }
+            }
 
             switch (runItem.Item.Slot)
             {
