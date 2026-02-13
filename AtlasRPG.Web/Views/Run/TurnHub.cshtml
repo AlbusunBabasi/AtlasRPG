@@ -55,6 +55,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/css/turnhub.css" asp-append-version="true" />
+    <style>
+        
+    </style>
 </head>
 <body>
 
@@ -392,6 +395,13 @@
                                     <div class="ic-slot">@ri.Item.Slot</div>
                                 </div>
                                 <div class="ic-meta">@ItemIconMapper.GetSubTypeName(ri.Item) · iLv @ri.Item.ItemLevel · @ItemIconMapper.GetRarityLabel(ri.Item.Rarity)</div>
+                                @{
+                                    var impl1 = ItemIconMapper.GetImplicitStats(ri.Item);
+                                }
+                                @if (!string.IsNullOrEmpty(impl1))
+                                {
+                                    <div class="ic-implicit">@impl1</div>
+                                }
                                 @if (ri.Item.Affixes.Any())
                                 {
                                     <div class="ic-affixes">
@@ -438,6 +448,13 @@
                                     <div class="ic-slot">@ri.Item.Slot</div>
                                 </div>
                                 <div class="ic-meta">@ItemIconMapper.GetSubTypeName(ri.Item) · iLv @ri.Item.ItemLevel · @ItemIconMapper.GetRarityLabel(ri.Item.Rarity)</div>
+                                @{
+                                    var impl2 = ItemIconMapper.GetImplicitStats(ri.Item);
+                                }
+                                @if (!string.IsNullOrEmpty(impl2))
+                                {
+                                    <div class="ic-implicit">@impl2</div>
+                                }
                                 @if (ri.Item.Affixes.Any())
                                 {
                                     <div class="ic-affixes">
@@ -501,6 +518,13 @@
                                     <div class="ic-slot">@item.Slot</div>
                                 </div>
                                 <div class="ic-meta">@ItemIconMapper.GetSubTypeName(item) · iLv @item.ItemLevel · @ItemIconMapper.GetRarityLabel(item.Rarity)</div>
+                                @{
+                                    var impl3 = ItemIconMapper.GetImplicitStats(item);
+                                }
+                                @if (!string.IsNullOrEmpty(impl3))
+                                {
+                                    <div class="ic-implicit">@impl3</div>
+                                }
                                 @if (item.Affixes.Any())
                                 {
                                     <div class="ic-affixes">
@@ -534,8 +558,8 @@
                 }
 
                 <div class="upgrade-link-wrap">
-                    <a href="/Shop/Index?runId=@Model.Run.Id" class="upgrade-link">
-                        🔧 Upgrade Shop — Enhance &amp; Reroll Items
+                    <a asp-controller="Shop" asp-action="Upgrade" asp-route-runId="@Model.Run.Id">
+                        ⬆️ Upgrade Items
                     </a>
                 </div>
             </div><!-- /tab-shop -->
