@@ -522,11 +522,6 @@ namespace AtlasRPG.Web.Controllers
             if (run == null)
                 return NotFound();
 
-            if (run.AvailableStatPoints <= 0)
-            {
-                TempData["Info"] = "No stat points available";
-                return RedirectToAction("TurnHub", new { id = run.Id });
-            }
 
             var viewModel = new AllocateStatsViewModel
             {
