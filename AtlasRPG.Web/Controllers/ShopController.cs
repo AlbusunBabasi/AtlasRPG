@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using AtlasRPG.Application.Services;
 using AtlasRPG.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace AtlasRPG.Web.Controllers
 {
@@ -107,6 +108,27 @@ namespace AtlasRPG.Web.Controllers
                 : "Not enough gold or already max rarity!";
 
             return RedirectToAction("Index", new { runId });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Upgrade(Guid runId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            var run = await _context.Runs
+                .Include(r => r.Inventory)
+                    .ThenInclude(ri => ri.Item)
+                    .ThenInclude(i => i.Affixes)
+                    .ThenInclude(a => a.AffixDefinition)
+                .FirstOrDefaultAsync(r => r.Id == runId && r.UserId == userId && r.IsActive);
+
+            if (run == null) return NotFound();
+
+            ViewBag.Run = run;
+            return View(run.Inventory
+                .Where(ri => !ri.IsEquipped)   // sadece çantadakiler upgrade edilebilir
+                .Select(ri => ri)
+                .ToList());
         }
     }
 }
