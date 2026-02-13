@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Web/Helpers/ItemIconMapper.cs
+// AtlasRPG.Web/Helpers/ItemIconMapper.cs
 // Migration gerektirecek değişikliklerle güncellendi.
 // OffhandType ve ArmorType alanlarını kullanır.
 
@@ -190,6 +190,42 @@ namespace AtlasRPG.Web.Helpers
             return aff.RolledValue == Math.Floor(aff.RolledValue)
                 ? $"+{(int)aff.RolledValue}"
                 : $"+{aff.RolledValue:F1}";
+        }
+        public static string GetImplicitStats(Item item)
+        {
+            var parts = new List<string>();
+
+            if (item.Slot == ItemSlot.Weapon)
+            {
+                if (item.BaseDamage > 0)
+                    parts.Add($"⚔️ {item.BaseDamage:F0} dmg");
+                if (item.BaseAttackSpeed > 0)
+                    parts.Add($"⚡ {item.BaseAttackSpeed:F0} spd");
+                if (item.BaseCritChance > 0)
+                    parts.Add($"💥 {(item.BaseCritChance * 100):F0}% crit");
+            }
+            else if (item.Slot == ItemSlot.Offhand)
+            {
+                if (item.BaseBlockChance > 0)
+                    parts.Add($"🛡️ {(item.BaseBlockChance * 100):F0}% block");
+                if (item.BaseArmor > 0)
+                    parts.Add($"🪬 {item.BaseArmor:F0} armor");
+                if (item.BaseEvasion > 0)
+                    parts.Add($"💨 {item.BaseEvasion:F0} evasion");
+                if (item.BaseWard > 0)
+                    parts.Add($"🔵 {item.BaseWard:F0} ward");
+            }
+            else if (item.Slot == ItemSlot.Armor)
+            {
+                if (item.BaseArmor > 0)
+                    parts.Add($"🪬 {item.BaseArmor:F0} armor");
+                if (item.BaseEvasion > 0)
+                    parts.Add($"💨 {item.BaseEvasion:F0} evasion");
+                if (item.BaseWard > 0)
+                    parts.Add($"🔵 {item.BaseWard:F0} ward");
+            }
+
+            return parts.Any() ? string.Join("  ", parts) : string.Empty;
         }
 
         // ─── PRIVATE HELPERS ─────────────────────────────────────────
