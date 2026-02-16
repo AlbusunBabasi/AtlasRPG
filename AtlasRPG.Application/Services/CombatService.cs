@@ -68,6 +68,7 @@ namespace AtlasRPG.Application.Services
             bool playerFirstSkillUsed = false;
             int effectiveSkillCooldown = activeSkill != null
                 ? ApplyPassiveCooldownReduction(activeSkill.Cooldown, pPb) : 0;
+
             bool playerHasFirstStrike = playerActsFirst;
             bool playerFirstHitReceived = false;
             bool opponentFirstHitReceived = false;
@@ -120,8 +121,6 @@ namespace AtlasRPG.Application.Services
                 // Stun: bu roundda skip mi?
                 bool playerIsStunned = playerStunRoundsRemaining > 0;
                 bool opponentIsStunned = opponentStunRoundsRemaining > 0;
-                if (playerStunRoundsRemaining > 0) playerStunRoundsRemaining--;
-                if (opponentStunRoundsRemaining > 0) opponentStunRoundsRemaining--;
 
                 // Player auto-cast
                 string playerAction = "BasicAttack";
@@ -153,56 +152,78 @@ namespace AtlasRPG.Application.Services
                 if (playerActsFirst)
                 {
                     if (!playerIsStunned)
-                        ExecuteActionWithPassives(playerStats, opponentStats, playerAction, playerMultiplier,
+                    {
+                        ExecuteActionWithPassives(
+                            playerStats, opponentStats, playerAction, playerMultiplier,
                             round, isPlayer: true, attackerGoesFirst: playerHasFirstStrike,
                             ref opponentFirstHitReceived,
                             activeSkill: playerAction != "BasicAttack" ? activeSkill : null,
                             ref opponentStunRoundsRemaining);
+                    }
                     else
                     {
                         round.PlayerAction = "Stunned"; round.PlayerHit = false;
                         round.EventLog = AppendLog(round.EventLog, "Stun: Player skips");
+                        if (playerStunRoundsRemaining > 0) playerStunRoundsRemaining--;
                     }
+
+                    // ✅ player aksiyonundan sonra stun yemis olabilir
+                    opponentIsStunned = opponentStunRoundsRemaining > 0;
 
                     if (opponentStats.CurrentHp > 0)
                     {
                         if (!opponentIsStunned)
-                            ExecuteActionWithPassives(opponentStats, playerStats, opponentAction, opponentMultiplier,
+                        {
+                            ExecuteActionWithPassives(
+                                opponentStats, playerStats, opponentAction, opponentMultiplier,
                                 round, isPlayer: false, attackerGoesFirst: !playerHasFirstStrike,
                                 ref playerFirstHitReceived, activeSkill: null,
                                 ref playerStunRoundsRemaining);
+                        }
                         else
                         {
                             round.OpponentAction = "Stunned"; round.OpponentHit = false;
                             round.EventLog = AppendLog(round.EventLog, "Stun: Opponent skips");
+                            if (opponentStunRoundsRemaining > 0) opponentStunRoundsRemaining--;
                         }
                     }
                 }
                 else
                 {
                     if (!opponentIsStunned)
-                        ExecuteActionWithPassives(opponentStats, playerStats, opponentAction, opponentMultiplier,
+                    {
+                        ExecuteActionWithPassives(
+                            opponentStats, playerStats, opponentAction, opponentMultiplier,
                             round, isPlayer: false, attackerGoesFirst: !playerHasFirstStrike,
                             ref playerFirstHitReceived, activeSkill: null,
                             ref playerStunRoundsRemaining);
+                    }
                     else
                     {
                         round.OpponentAction = "Stunned"; round.OpponentHit = false;
                         round.EventLog = AppendLog(round.EventLog, "Stun: Opponent skips");
+                        if (opponentStunRoundsRemaining > 0) opponentStunRoundsRemaining--;
                     }
+
+                    // ✅ opponent aksiyonundan sonra player stun yemis olabilir
+                    playerIsStunned = playerStunRoundsRemaining > 0;
 
                     if (playerStats.CurrentHp > 0)
                     {
                         if (!playerIsStunned)
-                            ExecuteActionWithPassives(playerStats, opponentStats, playerAction, playerMultiplier,
+                        {
+                            ExecuteActionWithPassives(
+                                playerStats, opponentStats, playerAction, playerMultiplier,
                                 round, isPlayer: true, attackerGoesFirst: playerHasFirstStrike,
                                 ref opponentFirstHitReceived,
                                 activeSkill: playerAction != "BasicAttack" ? activeSkill : null,
                                 ref opponentStunRoundsRemaining);
+                        }
                         else
                         {
                             round.PlayerAction = "Stunned"; round.PlayerHit = false;
                             round.EventLog = AppendLog(round.EventLog, "Stun: Player skips");
+                            if (playerStunRoundsRemaining > 0) playerStunRoundsRemaining--;
                         }
                     }
                 }
@@ -228,6 +249,7 @@ namespace AtlasRPG.Application.Services
             combatResult.OpponentCriticalHits = combatResult.Rounds.Count(r => r.OpponentCrit);
             return combatResult;
         }
+
 
         // YARDIMCI: Aksiyon calistir
         private void ExecuteActionWithPassives(
@@ -268,29 +290,34 @@ namespace AtlasRPG.Application.Services
             var action = _damageCalculator.CalculateAttack(
                 attacker, defender, actionName, multiplier * bonusMult);
 
-            if (action.DidHit && action.FinalDamage > 0)
+            // ✅ OnHit efektleri: sadece "hit" ile bağla (damage 0 olsa bile proc edebilir)
+            if (action.DidHit)
             {
-                // OnHit efektleri + stun
-                if (isPlayer && activeSkill != null
+                if (activeSkill != null
                     && !string.IsNullOrEmpty(activeSkill.EffectJson)
                     && activeSkill.EffectJson != "{}")
                 {
                     SkillEffectApplier.ApplyOnHit(
                         attacker, defender, activeSkill.EffectJson, attacker.BaseDamage);
 
-                    // Stun kontrolü: ApplyOnHit, stun'u defender.StatusEffects'e yazar.
-                    // Oradan okuyup loop sayacını set et, sonra temizle.
+                    // ✅ Stun status'ü geldi mi? Sayaç set et (max ile).
                     var stunEffect = defender.StatusEffects
                         .FirstOrDefault(e => e.Type == "Stun" && e.RemainingRounds > 0);
-                    if (stunEffect != null && defenderStunRoundsRemaining == 0)
+
+                    if (stunEffect != null)
                     {
-                        defenderStunRoundsRemaining = stunEffect.RemainingRounds;
-                        defender.StatusEffects.Remove(stunEffect);
-                        round.EventLog = AppendLog(round.EventLog, "⚡ STUN applied! Opponent skips next action.");
+                        defenderStunRoundsRemaining = Math.Max(defenderStunRoundsRemaining, stunEffect.RemainingRounds);
+                        round.EventLog = AppendLog(round.EventLog,
+                            $"⚡ STUN queued! (stunRounds={defenderStunRoundsRemaining})");
                     }
                 }
+            }
 
+            // Taken multiplier / mitigation sadece gerçek hasar varsa uygulanır
+            if (action.DidHit && action.FinalDamage > 0)
+            {
                 decimal takenMult = 1.0m;
+
                 if (!defenderFirstHitReceived && dPb.FirstHitDamageTakenMult < 1.0m)
                 {
                     takenMult *= dPb.FirstHitDamageTakenMult;
@@ -323,6 +350,7 @@ namespace AtlasRPG.Application.Services
                 round.OpponentBlocked = action.WasBlocked;
             }
         }
+
 
         private void ApplySuddenDeath(CharacterStats player, CharacterStats opponent, int stacks)
         {
