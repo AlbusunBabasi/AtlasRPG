@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 using AtlasRPG.Core.ValueObjects;
 
 namespace AtlasRPG.Application.Services
@@ -95,7 +96,9 @@ namespace AtlasRPG.Application.Services
                 character.StatusEffects.Remove(e);
 
             // Stun bir round sonra sıfırlanır
-            character.IsStunned = false;
+            // UI icin: stun state'ini status listesine gore tut (combat kararinda tek kaynak olmamali)
+            character.IsStunned = character.StatusEffects.Any(e => e.Type == "Stun" && e.RemainingRounds > 0);
+
 
             return totalDamage;
         }
@@ -215,11 +218,25 @@ namespace AtlasRPG.Application.Services
                         break;
 
                     case "applyStun":
+                        // Stun: CombatService tarafinda defenderStunRoundsRemaining sayacina map edilir.
+                        // Bu nedenle burada IsStunned bool'u yerine StatusEffect ekliyoruz.
                         double stunChance = data.TryGetProperty("chance", out var sc)
                             ? sc.GetDouble() : 1.0;
+
+                        int dur = data.TryGetProperty("duration", out var sd)
+                            ? sd.GetInt32() : 1;
+
                         if (_rng.NextDouble() < stunChance)
-                            target.IsStunned = true;
+                        {
+                            AddOrRefreshStatus(target.StatusEffects, new ActiveStatusEffect
+                            {
+                                Type = "Stun",
+                                RemainingRounds = dur,
+                                MaxStacks = 1
+                            });
+                        }
                         break;
+
 
                     case "applyArmorShred":
                         // Armor geçici olarak azalt
