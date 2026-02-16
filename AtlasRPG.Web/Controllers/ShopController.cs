@@ -94,7 +94,7 @@ namespace AtlasRPG.Web.Controllers
                 ? "Affixes rerolled!"
                 : "Not enough gold!";
 
-            return RedirectToAction("Index", new { runId });
+            return RedirectToAction("Upgrade", new { runId });
         }
 
         [HttpPost]
@@ -107,7 +107,7 @@ namespace AtlasRPG.Web.Controllers
                 ? "Item upgraded!"
                 : "Not enough gold or already max rarity!";
 
-            return RedirectToAction("Index", new { runId });
+            return RedirectToAction("Upgrade", new { runId });
         }
 
         [HttpGet]
