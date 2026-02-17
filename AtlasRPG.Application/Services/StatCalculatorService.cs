@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Application/Services/StatCalculatorService.cs
+// AtlasRPG.Application/Services/StatCalculatorService.cs
 using AtlasRPG.Core.Entities.Runs;
 using AtlasRPG.Core.Entities.Items;
 using AtlasRPG.Core.Entities.GameData;
@@ -53,8 +53,11 @@ namespace AtlasRPG.Application.Services
         {
             var stats = new CharacterStats();
 
-            // 1. Primary Stats (wound debuff uygula)
-            decimal woundMultiplier = run.HasWoundDebuff ? 0.97m : 1.0m;
+
+            // 1. Primary Stats
+            decimal woundMultiplier = (run.HasWoundDebuff && run.Race != RaceType.Undead)
+                ? 0.97m
+                : 1.0m;  // ✅ Undead wound'ı ignore eder
 
             stats.Strength = (int)(run.Strength * woundMultiplier);
             stats.Dexterity = (int)(run.Dexterity * woundMultiplier);
@@ -235,12 +238,77 @@ namespace AtlasRPG.Application.Services
             // 15i. ArmorPenetration
             stats.ArmorPenetration += pb.ArmorPenetration;
 
+            // ════════════════════════════════════════════════════════
+            // RACIAL ABILITIES
+            // ════════════════════════════════════════════════════════
+            switch (run.Race)
+            {
+                case RaceType.Human:
+                    // Adaptive Growth: her tur +1 stat point → RunService'te turn sonu uygulanır
+                    // Trader's Instinct: shop fiyatı %5 indirim → ShopService'te uygulanır
+                    // Bu stat hesabında ek bir şey yok
+                    break;
+
+                case RaceType.Dwarf:
+                    // Stonehide: +5% Armor
+                    stats.Armor *= 1.05m;
+                    // Steadfast: Debuff süresi -1 → PassiveBonuses'a flag
+                    pb.DebuffDurationReduction = Math.Max(pb.DebuffDurationReduction, 1);
+                    break;
+
+                case RaceType.Orc:
+                    // Savage Sustain: %1 Lifesteal
+                    pb.LifeSteal += 0.01m;
+                    // Bloodlust: PVP galibiyetten sonra +%X hasar → CombatService'te uygulanır (run'da flag var)
+                    // Buraya ekleyebiliriz: eğer run.LastPvpWon ise damage bonus
+                    if (run.LastTurnWasVictory && run.LastTurnWasPvp)
+                        pb.IncreasedDamage += 0.15m;  // %15 damage bonus (tasarım dokümanından X değeri)
+                    break;
+
+                case RaceType.Undead:
+                    // Void-Touched: +%15 Chaos Resist
+                    stats.ChaosResist = Math.Clamp(stats.ChaosResist + 0.15m, -0.50m, 0.75m);
+                    // Unfeeling: Wound işlemez → zaten wound multiplier var, onu bypass et
+                    // woundMultiplier'ı 1.0m'e zorla
+                    if (run.HasWoundDebuff)
+                    {
+                        // Primary stats zaten wound ile hesaplandı, geri al
+                        decimal woundCorrection = run.HasWoundDebuff ? (1.0m / 0.97m) : 1.0m;
+                        stats.Strength = (int)(stats.Strength * woundCorrection);
+                        stats.Dexterity = (int)(stats.Dexterity * woundCorrection);
+                        stats.Agility = (int)(stats.Agility * woundCorrection);
+                        stats.Intelligence = (int)(stats.Intelligence * woundCorrection);
+                        stats.Vitality = (int)(stats.Vitality * woundCorrection);
+                        stats.Wisdom = (int)(stats.Wisdom * woundCorrection);
+                        // Stats'ı yeniden hesapla gerekirse — veya daha temiz yol:
+                        // woundMultiplier'ı başta 1.0m yap eğer Undead ise
+                    }
+                    break;
+
+                case RaceType.Drakoid:
+                    // Scaled Hide: +%5 All Resist
+                    stats.FireResist = Math.Clamp(stats.FireResist + 0.05m, -0.50m, 0.75m);
+                    stats.ColdResist = Math.Clamp(stats.ColdResist + 0.05m, -0.50m, 0.75m);
+                    stats.LightningResist = Math.Clamp(stats.LightningResist + 0.05m, -0.50m, 0.75m);
+                    stats.ChaosResist = Math.Clamp(stats.ChaosResist + 0.05m, -0.50m, 0.75m);
+                    // Draconic Core (Elemental hasar→mana dönüşümü) → CombatService'te uygulanır
+                    pb.DraconicCoreActive = true;
+                    break;
+            }
+
             // 15j. Passive combat bonuses'ı sakla (CombatService okuyacak)
             stats.PassiveBonuses = pb;
 
             // 16. Current HP/Mana = Max (turn başı) — eski adım 14 artık 16
             stats.CurrentHp = stats.MaxHp;
             stats.CurrentMana = stats.MaxMana;
+
+            // 17. Flat Elemental Damage (sadece weapon affixlerinden)
+            stats.FlatFireDamage = GetAffixSum(allAffixes, "FlatFireDamage");
+            stats.FlatColdDamage = GetAffixSum(allAffixes, "FlatColdDamage");
+            stats.FlatLightningDamage = GetAffixSum(allAffixes, "FlatLightningDamage");
+            stats.FlatChaosDamage = GetAffixSum(allAffixes, "FlatChaosDamage");
+
             return stats;
         }
 
