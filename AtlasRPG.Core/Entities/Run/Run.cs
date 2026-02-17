@@ -1,4 +1,4 @@
-﻿using AtlasRPG.Core.Entities.Identity;
+using AtlasRPG.Core.Entities.Identity;
 using AtlasRPG.Core.Entities.Items;
 using AtlasRPG.Core.Entities.Player;
 using AtlasRPG.Core.Enums;
@@ -44,5 +44,8 @@ namespace AtlasRPG.Core.Entities.Runs
         public RunEquipment? Equipment { get; set; }
 
         public DateTime? CompletedAt { get; set; }
+
+        public bool LastTurnWasVictory { get; set; } = false;
+        public bool LastTurnWasPvp { get; set; } = false;
     }
 }
