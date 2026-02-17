@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Core/ValueObjects/CombatAction.cs
+// AtlasRPG.Core/ValueObjects/CombatAction.cs
 namespace AtlasRPG.Core.ValueObjects
 {
     public class CombatAction
@@ -13,5 +13,6 @@ namespace AtlasRPG.Core.ValueObjects
         public decimal RawDamage { get; set; }
         public decimal FinalDamage { get; set; }
         public string DamageType { get; set; } = "Physical"; // Physical, Fire, Cold, Lightning, Chaos
+        public decimal WardAbsorbed { get; set; } = 0m;
     }
 }
