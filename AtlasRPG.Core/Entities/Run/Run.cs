@@ -47,5 +47,8 @@ namespace AtlasRPG.Core.Entities.Runs
 
         public bool LastTurnWasVictory { get; set; } = false;
         public bool LastTurnWasPvp { get; set; } = false;
+
+        public int ShopLastGeneratedTurn { get; set; } = 0;
+        public string ShopItemIdsJson { get; set; } = "[]";
     }
 }
