@@ -36,6 +36,15 @@ namespace AtlasRPG.Web.Models.RunViews
         public decimal ChaosResist => Stats.ChaosResist;
         public decimal CritMult => Stats.CritMultiplier;
         public decimal ArmorPen => Stats.ArmorPenetration;
+        public decimal FlatFireDamage => Stats.FlatFireDamage;
+        public decimal FlatColdDamage => Stats.FlatColdDamage;
+        public decimal FlatLightningDamage => Stats.FlatLightningDamage;
+        public decimal FlatChaosDamage => Stats.FlatChaosDamage;
+
+        // Karşı taraf için proxy evasion (ortalama varsayım)
+        public decimal HitChance => Stats.Evasion > 0
+            ? Math.Min(0.95m, Math.Max(0.05m, Stats.Accuracy / (Stats.Accuracy + Stats.Evasion)))
+            : 0.95m;
 
         public Guid? LastSelectedSkillId { get; set; }
         public List<AtlasRPG.Core.Entities.Items.Item> ShopItems { get; set; } = new();
