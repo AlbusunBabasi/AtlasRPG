@@ -1160,6 +1160,7 @@
 
             tickSt("p"); tickSt("e");
 
+
             // Oyuncu DOT hasar aldıysa göster
             if (pDot > 0.5) {
               const lp = dotLabel(pSt);
@@ -1175,6 +1176,16 @@
             }
 
             await slp(pDot > 0.5 || eDot > 0.5 ? 80 : 160);
+
+            // Ward absorbed göster
+            if (r.playerWardAbsorbed > 0.5) {
+                addEv(`<span class="ptx" style="color:#88aaff">🔮 Ward absorbs <strong>${Math.ceil(r.playerWardAbsorbed)}</strong> damage</span>`, "proc");
+                await slp(120);
+            }
+            if (r.opponentWardAbsorbed > 0.5) {
+                addEv(`<span class="ptx" style="color:#88aaff">🔮 Enemy Ward absorbs <strong>${Math.ceil(r.opponentWardAbsorbed)}</strong> damage</span>`, "proc");
+                await slp(120);
+            }
 
             // Player action
             if(r.playerHit){
