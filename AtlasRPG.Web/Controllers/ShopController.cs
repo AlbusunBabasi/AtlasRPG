@@ -22,7 +22,6 @@ namespace AtlasRPG.Web.Controllers
             _shopService = shopService;
         }
 
-        // AtlasRPG.Web/Controllers/ShopController.cs
         [HttpGet]
         public async Task<IActionResult> Index(Guid runId)
         {
@@ -39,18 +38,8 @@ namespace AtlasRPG.Web.Controllers
             if (run == null)
                 return NotFound();
 
-            // Shop item'larını generate et
-            var shopItems = await _shopService.GenerateShopInventory(run.CurrentTurn);
-
-            // ✅ Contains YOK — her item için affixleri ayrı ayrı yükle
-            foreach (var item in shopItems)
-            {
-                await _context.Entry(item)
-                    .Collection(i => i.Affixes)
-                    .Query()
-                    .Include(a => a.AffixDefinition)
-                    .LoadAsync();
-            }
+            // ✅ run nesnesini geçir — cache çalışsın
+            var shopItems = await _shopService.GenerateShopInventory(run);
 
             ViewBag.Run = run;
             ViewBag.ShopItems = shopItems;
