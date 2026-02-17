@@ -223,16 +223,37 @@ namespace AtlasRPG.Application.Services
             if (runItem.Run.Gold < cost) return false;
 
             runItem.Run.Gold -= cost;
-            runItem.Item.Rarity = runItem.Item.Rarity == ItemRarity.Normal
+
+            // Hedef rarity ve affix sayısı
+            ItemRarity newRarity = runItem.Item.Rarity == ItemRarity.Normal
                 ? ItemRarity.Magic
                 : ItemRarity.Rare;
 
-            // ⭐ Gold ve rarity değişikliğini kaydet
+            int targetAffixCount = newRarity switch
+            {
+                ItemRarity.Magic => 2,
+                ItemRarity.Rare => 3,
+                _ => 1
+            };
+
+            // ✅ Sadece eksik kadar affix ekle (mevcut korunur)
+            int currentCount = runItem.Item.Affixes.Count;
+            int toAdd = targetAffixCount - currentCount;
+
+            runItem.Item.Rarity = newRarity;
             await _context.SaveChangesAsync();
 
-            // Yeni affix ekle
-            await _itemGenerator.GenerateAffixes(runItem.Item, runItem.Item.Rarity, runItem.Item.ItemLevel);
-            await _context.SaveChangesAsync(); // ⭐ Ayrı batch
+            if (toAdd > 0)
+            {
+                // Mevcut affix key'leri — duplicate engeli için
+                var existingKeys = runItem.Item.Affixes
+                    .Select(a => a.AffixDefinition?.AffixKey ?? "")
+                    .ToHashSet();
+
+                await _itemGenerator.GenerateAffixesWithCount(
+                    runItem.Item, toAdd, runItem.Item.ItemLevel, existingKeys);
+                await _context.SaveChangesAsync();
+            }
 
             return true;
         }
