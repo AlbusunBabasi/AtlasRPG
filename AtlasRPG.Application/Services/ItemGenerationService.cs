@@ -245,9 +245,10 @@ namespace AtlasRPG.Application.Services
 
             // Slot + subtype bilgisiyle affix havuzunu belirle
             string slotKey = GetSlotKey(item);
-
+            // Hem spesifik (Shield/Quiver/Focus) hem de genel "Offhand" affixleri dahil et
             var eligibleAffixes = await _context.AffixDefinitions
-                .Where(a => a.AllowedSlots.Contains(slotKey))
+                .Where(a => a.AllowedSlots.Contains(slotKey)
+                         || (item.Slot == ItemSlot.Offhand && a.AllowedSlots.Contains("Offhand")))
                 .ToListAsync();
 
             if (!eligibleAffixes.Any()) return;
@@ -302,6 +303,56 @@ namespace AtlasRPG.Application.Services
             await _context.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Belirli sayıda, mevcut key'leri hariç tutarak affix ekler (Upgrade için).
+        /// </summary>
+        public async Task GenerateAffixesWithCount(
+            Item item,
+            int count,
+            int itemLevel,
+            HashSet<string> existingKeys)
+        {
+            string slotKey = GetSlotKey(item);
+
+            var eligibleAffixes = await _context.AffixDefinitions
+                .Where(a => a.AllowedSlots.Contains(slotKey))
+                .ToListAsync();
+
+            for (int i = 0; i < count; i++)
+            {
+                var available = eligibleAffixes
+                    .Where(a => !existingKeys.Contains(a.AffixKey))
+                    .ToList();
+
+                if (!available.Any()) break;
+
+                var chosen = available[_random.Next(available.Count)];
+                existingKeys.Add(chosen.AffixKey);
+
+                int tierRoll = _random.Next(100);
+                int tier;
+                decimal min, max;
+
+                if (tierRoll < 65) { tier = 1; min = chosen.Tier1Min; max = chosen.Tier1Max; }
+                else if (tierRoll < 90) { tier = 2; min = chosen.Tier2Min; max = chosen.Tier2Max; }
+                else { tier = 3; min = chosen.Tier3Min; max = chosen.Tier3Max; }
+
+                decimal range = max - min;
+                decimal rolled = range <= 0 ? min : min + (decimal)(_random.NextDouble()) * range;
+                rolled = Math.Round(rolled, 4);
+
+                _context.ItemAffixes.Add(new ItemAffix
+                {
+                    ItemId = item.Id,
+                    AffixDefinitionId = chosen.Id,
+                    Tier = tier,
+                    RolledValue = rolled
+                });
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
         // Affix filtreleme için slot anahtarı
         // AffixDefinition.AllowedSlots: "Weapon", "Offhand", "Armor", "Belt"
         // + subtype ekstraları: "Offhand(Shield)", "Offhand(Quiver)", "Offhand(Focus)"
@@ -322,5 +373,6 @@ namespace AtlasRPG.Application.Services
                 _ => "Offhand"
             };
         }
+
     }
 }
