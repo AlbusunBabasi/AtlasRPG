@@ -43,7 +43,6 @@ namespace AtlasRPG.Web.Controllers
             return View();
         }
 
-        // POST: /Inventory/Equip
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Equip(Guid runId, Guid runItemId)
@@ -53,7 +52,7 @@ namespace AtlasRPG.Web.Controllers
             if (success)
                 TempData["Success"] = "Item equipped successfully!";
             else
-                TempData["Error"] = "Failed to equip item";
+                TempData["Error"] = "Cannot equip: 2H weapon cannot use an offhand, or weapon/offhand type mismatch.";  // ✅
 
             return RedirectToAction("TurnHub", "Run", new { id = runId });
         }
