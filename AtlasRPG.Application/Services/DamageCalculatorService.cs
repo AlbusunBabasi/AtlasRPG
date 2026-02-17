@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Application/Services/DamageCalculatorService.cs
+// AtlasRPG.Application/Services/DamageCalculatorService.cs
 using AtlasRPG.Core.ValueObjects;
 using System;
 
@@ -83,7 +83,7 @@ namespace AtlasRPG.Application.Services
             {
                 decimal wardAbsorbed = Math.Min(defender.Ward, damageAfterMitigation);
                 damageAfterMitigation -= wardAbsorbed;
-                // Note: Ward değişimi combat state'de tutulmalı
+                action.WardAbsorbed = wardAbsorbed;  // ✅ artık kaydediliyor
             }
 
             action.FinalDamage = Math.Max(0, damageAfterMitigation);
