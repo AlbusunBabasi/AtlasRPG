@@ -145,7 +145,7 @@ namespace AtlasRPG.Web.Controllers
                     .ToListAsync();
             }
 
-            var shopItems = await _shopService.GenerateShopInventory(run.CurrentTurn);
+            var shopItems = await _shopService.GenerateShopInventory(run);
             foreach (var si in shopItems)
             {
                 await _context.Entry(si)
