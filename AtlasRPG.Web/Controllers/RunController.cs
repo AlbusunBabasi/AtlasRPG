@@ -247,6 +247,7 @@ namespace AtlasRPG.Web.Controllers
             _context.CombatResults.Add(combatResult);
             turn.CombatResultId = combatResult.Id;
 
+
             await _context.SaveChangesAsync();
 
             // ✅ isVictory kaynağı: combat sonucu — forma asla güvenme
@@ -578,6 +579,7 @@ namespace AtlasRPG.Web.Controllers
             run.Luck += model.LuckToAdd;
 
             run.AvailableStatPoints -= totalToSpend;
+
 
             await _context.SaveChangesAsync();
 
