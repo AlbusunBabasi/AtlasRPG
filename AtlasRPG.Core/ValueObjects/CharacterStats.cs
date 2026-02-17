@@ -58,5 +58,11 @@ namespace AtlasRPG.Core.ValueObjects
         public PassiveBonuses PassiveBonuses { get; set; } = new();
         public List<ActiveStatusEffect> StatusEffects { get; set; } = new();
         public bool IsStunned { get; set; } = false;
+
+        // Flat Elemental Damage (weapon affixlerinden gelir)
+        public decimal FlatFireDamage { get; set; } = 0m;
+        public decimal FlatColdDamage { get; set; } = 0m;
+        public decimal FlatLightningDamage { get; set; } = 0m;
+        public decimal FlatChaosDamage { get; set; } = 0m;
     }
 }
