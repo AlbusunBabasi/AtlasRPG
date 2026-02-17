@@ -241,48 +241,35 @@ namespace AtlasRPG.Application.Services
             // ════════════════════════════════════════════════════════
             // RACIAL ABILITIES
             // ════════════════════════════════════════════════════════
+            // ════════════════════════════════════════════════════════
+            // RACIAL ABILITIES
+            // ════════════════════════════════════════════════════════
             switch (run.Race)
             {
                 case RaceType.Human:
-                    // Adaptive Growth: her tur +1 stat point → RunService'te turn sonu uygulanır
+                    // Adaptive Growth: her tur +1 stat point → RunService'te uygulanır
                     // Trader's Instinct: shop fiyatı %5 indirim → ShopService'te uygulanır
-                    // Bu stat hesabında ek bir şey yok
                     break;
 
                 case RaceType.Dwarf:
                     // Stonehide: +5% Armor
                     stats.Armor *= 1.05m;
-                    // Steadfast: Debuff süresi -1 → PassiveBonuses'a flag
+                    // Steadfast: Debuff süresi -1 round
                     pb.DebuffDurationReduction = Math.Max(pb.DebuffDurationReduction, 1);
                     break;
 
                 case RaceType.Orc:
                     // Savage Sustain: %1 Lifesteal
                     pb.LifeSteal += 0.01m;
-                    // Bloodlust: PVP galibiyetten sonra +%X hasar → CombatService'te uygulanır (run'da flag var)
-                    // Buraya ekleyebiliriz: eğer run.LastPvpWon ise damage bonus
+                    // Bloodlust: PVP galibiyetinden sonra o tur +%15 hasar
                     if (run.LastTurnWasVictory && run.LastTurnWasPvp)
-                        pb.IncreasedDamage += 0.15m;  // %15 damage bonus (tasarım dokümanından X değeri)
+                        pb.IncreasedDamageGlobal += 0.15m;
                     break;
 
                 case RaceType.Undead:
                     // Void-Touched: +%15 Chaos Resist
                     stats.ChaosResist = Math.Clamp(stats.ChaosResist + 0.15m, -0.50m, 0.75m);
-                    // Unfeeling: Wound işlemez → zaten wound multiplier var, onu bypass et
-                    // woundMultiplier'ı 1.0m'e zorla
-                    if (run.HasWoundDebuff)
-                    {
-                        // Primary stats zaten wound ile hesaplandı, geri al
-                        decimal woundCorrection = run.HasWoundDebuff ? (1.0m / 0.97m) : 1.0m;
-                        stats.Strength = (int)(stats.Strength * woundCorrection);
-                        stats.Dexterity = (int)(stats.Dexterity * woundCorrection);
-                        stats.Agility = (int)(stats.Agility * woundCorrection);
-                        stats.Intelligence = (int)(stats.Intelligence * woundCorrection);
-                        stats.Vitality = (int)(stats.Vitality * woundCorrection);
-                        stats.Wisdom = (int)(stats.Wisdom * woundCorrection);
-                        // Stats'ı yeniden hesapla gerekirse — veya daha temiz yol:
-                        // woundMultiplier'ı başta 1.0m yap eğer Undead ise
-                    }
+                    // Unfeeling: Wound işlemez → başta woundMultiplier zaten 1.0m yapıldı
                     break;
 
                 case RaceType.Drakoid:
@@ -291,7 +278,7 @@ namespace AtlasRPG.Application.Services
                     stats.ColdResist = Math.Clamp(stats.ColdResist + 0.05m, -0.50m, 0.75m);
                     stats.LightningResist = Math.Clamp(stats.LightningResist + 0.05m, -0.50m, 0.75m);
                     stats.ChaosResist = Math.Clamp(stats.ChaosResist + 0.05m, -0.50m, 0.75m);
-                    // Draconic Core (Elemental hasar→mana dönüşümü) → CombatService'te uygulanır
+                    // Draconic Core: combat-time'da kullanılır
                     pb.DraconicCoreActive = true;
                     break;
             }
