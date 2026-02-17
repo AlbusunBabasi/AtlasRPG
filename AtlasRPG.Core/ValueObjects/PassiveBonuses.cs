@@ -146,6 +146,8 @@ namespace AtlasRPG.Core.ValueObjects
         public int DebuffDurationReduction { get; set; } = 0;  // Dwarf Steadfast
         public bool DraconicCoreActive { get; set; } = false;  // Drakoid Draconic Core
 
+        public decimal LifeSteal { get; set; } = 0m;
+
         // ────────────────────────────────────────────
         // HELPER: Weapon tipini string olarak al
         // ────────────────────────────────────────────
