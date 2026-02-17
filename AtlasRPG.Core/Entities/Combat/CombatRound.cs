@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -30,6 +30,8 @@ namespace AtlasRPG.Core.Entities.Combat
         // Round End State
         public decimal PlayerHpRemaining { get; set; }
         public decimal OpponentHpRemaining { get; set; }
+        public decimal PlayerWardAbsorbed { get; set; } = 0m;
+        public decimal OpponentWardAbsorbed { get; set; } = 0m;
 
         public string EventLog { get; set; } = string.Empty; // JSON or text summary
     }
