@@ -9,43 +9,7 @@
     // Inventory split
     var equippedItems = Model.Inventory.Where(i => i.IsEquipped).ToList();
     var bagItems = Model.Inventory.Where(i => !i.IsEquipped).ToList();
-
-    string RarityColor(ItemRarity r) => r switch
-    {
-        ItemRarity.Rare => "#e8c14a",
-        ItemRarity.Magic => "#5090ff",
-        _ => "#9a9a9a"
-    };
-    string RarityBorder(ItemRarity r) => r switch
-    {
-        ItemRarity.Rare => "rgba(232,193,74,.35)",
-        ItemRarity.Magic => "rgba(80,144,255,.35)",
-        _ => "rgba(150,150,150,.22)"
-    };
-    string RarityBg(ItemRarity r) => r switch
-    {
-        ItemRarity.Rare => "rgba(232,193,74,.06)",
-        ItemRarity.Magic => "rgba(80,144,255,.06)",
-        _ => "rgba(150,150,150,.04)"
-    };
-    string SlotIcon(ItemSlot s) => s switch
-    {
-        ItemSlot.Weapon => "⚔️",
-        ItemSlot.Armor => "🛡️",
-        ItemSlot.Belt => "🔰",
-        ItemSlot.Offhand => "🗡️",
-        _ => "📦"
-    };
-    string SlotLabel(ItemSlot s) => s switch
-    {
-        ItemSlot.Weapon => "Weapon",
-        ItemSlot.Armor => "Armor",
-        ItemSlot.Belt => "Belt",
-        ItemSlot.Offhand => "Offhand",
-        _ => "Item"
-    };
 }
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -182,7 +146,7 @@
                     ("Armor",    Model.Armor.ToString("F1"),                           false),
                     ("Crit",     (Model.CritChance*100).ToString("F1"),                true),
                     ("Crit×",    Model.CritMult.ToString("F2")+"×",                    false),
-                    ("Accuracy", (Model.Accuracy*100).ToString("F0"),                  true),
+                    ("Accuracy", (Model.HitChance*100).ToString("F0"),                  true),
                     ("Evasion",  Model.Evasion.ToString("F0"),                         false),
                     ("Block",    Model.BlockChance>0 ? (Model.BlockChance*100).ToString("F0") : "—", Model.BlockChance>0),
                     ("Arm.Pen",  Model.ArmorPen>0 ? (Model.ArmorPen*100).ToString("F0") : "—", Model.ArmorPen>0),
@@ -194,6 +158,27 @@
                         </div>
                     }
                 </div>
+                @if (Model.FlatFireDamage > 0)
+                {
+                    <div class="stat-row">
+                        <span class="stat-k">🔥 Fire</span>
+                        <span class="stat-v hi">+@Model.FlatFireDamage.ToString("F0")</span>
+                    </div>
+                }
+                @if (Model.FlatColdDamage > 0)
+                {
+                    <div class="stat-row">
+                        <span class="stat-k">❄️ Cold</span>
+                        <span class="stat-v hi">+@Model.FlatColdDamage.ToString("F0")</span>
+                    </div>
+                }
+                @if (Model.FlatLightningDamage > 0)
+                {
+                    <div class="stat-row">
+                        <span class="stat-k">⚡ Lightning</span>
+                        <span class="stat-v hi">+@Model.FlatLightningDamage.ToString("F0")</span>
+                    </div>
+                }
 
                 <!-- Resistances -->
                 <div class="stats-section">
@@ -364,6 +349,11 @@
 
             <!-- INVENTORY TAB -->
             <div class="tab-content active" id="tab-inv">
+                                <div class="upgrade-link-wrap">
+                    <a asp-controller="Shop" asp-action="Upgrade" asp-route-runId="@Model.Run.Id">
+                        ⬆️ Upgrade Items
+                    </a>
+                </div>
 
                 @if (Model.Run.AvailableSkillPoints > 0)
                 {
@@ -557,11 +547,7 @@
                     </div>
                 }
 
-                <div class="upgrade-link-wrap">
-                    <a asp-controller="Shop" asp-action="Upgrade" asp-route-runId="@Model.Run.Id">
-                        ⬆️ Upgrade Items
-                    </a>
-                </div>
+
             </div><!-- /tab-shop -->
 
         </div><!-- /right panel -->
