@@ -27,41 +27,41 @@ namespace AtlasRPG.Web.Helpers
         public static string GetWeaponIconPath(WeaponType weaponType) =>
             weaponType switch
             {
-                WeaponType.OneHandSword => "/images/items/weapon-1hsword.svg",
-                WeaponType.TwoHandSword => "/images/items/weapon-2hsword.svg",
-                WeaponType.Dagger => "/images/items/weapon-dagger.svg",
-                WeaponType.Bow => "/images/items/weapon-bow.svg",
-                WeaponType.Wand => "/images/items/weapon-wand.svg",
-                WeaponType.Staff => "/images/items/weapon-staff.svg",
-                _ => "/images/items/weapon-1hsword.svg",
+                WeaponType.OneHandSword => "/images/items/weapon-1hsword.png",
+                WeaponType.TwoHandSword => "/images/items/weapon-2hsword.png",
+                WeaponType.Dagger => "/images/items/weapon-dagger.png",
+                WeaponType.Bow => "/images/items/weapon-bow.png",
+                WeaponType.Wand => "/images/items/weapon-wand.png",
+                WeaponType.Staff => "/images/items/weapon-staff.png",
+                _ => "/images/items/weapon-1hsword.png",
             };
 
         public static string GetOffhandIconPath(OffhandType offhandType) =>
             offhandType switch
             {
-                OffhandType.Shield => "/images/items/offhand-shield.svg",
-                OffhandType.Quiver => "/images/items/offhand-quiver.svg",
-                OffhandType.Focus => "/images/items/offhand-focus.svg",
-                _ => "/images/items/armor-offhand.svg",
+                OffhandType.Shield => "/images/items/offhand-shield.png",
+                OffhandType.Quiver => "/images/items/offhand-quiver.png",
+                OffhandType.Focus => "/images/items/offhand-focus.png",
+                _ => "/images/items/armor-offhand.png",
             };
 
         public static string GetArmorIconPath(ArmorType armorType) =>
             armorType switch
             {
-                ArmorType.HeavyArmor => "/images/items/armor-heavy.svg",
-                ArmorType.EvasionArmor => "/images/items/armor-evasion.svg",
-                ArmorType.WardArmor => "/images/items/armor-ward.svg",
-                _ => "/images/items/armor-body.svg",
+                ArmorType.HeavyArmor => "/images/items/armor-heavy.png",
+                ArmorType.EvasionArmor => "/images/items/armor-evasion.png",
+                ArmorType.WardArmor => "/images/items/armor-ward.png",
+                _ => "/images/items/armor-body.png",
             };
 
         public static string GetSlotIconPath(ItemSlot slot) =>
             slot switch
             {
-                ItemSlot.Armor => "/images/items/armor-body.svg",
-                ItemSlot.Belt => "/images/items/armor-belt.svg",
-                ItemSlot.Offhand => "/images/items/armor-offhand.svg",
-                ItemSlot.Weapon => "/images/items/weapon-1hsword.svg",
-                _ => "/images/items/misc-unknown.svg",
+                ItemSlot.Armor => "/images/items/armor-body.png",
+                ItemSlot.Belt => "/images/items/armor-belt.png",
+                ItemSlot.Offhand => "/images/items/armor-offhand.png",
+                ItemSlot.Weapon => "/images/items/weapon-1hsword.png",
+                _ => "/images/items/misc-unknown.png",
             };
 
         // ─── Fallback emoji
