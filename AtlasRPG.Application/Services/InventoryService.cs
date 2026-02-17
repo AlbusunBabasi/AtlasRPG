@@ -62,12 +62,14 @@ namespace AtlasRPG.Application.Services
 
             if (equippingWeapon)
             {
-                bool newWeaponIs2H = runItem.Item.WeaponType is WeaponType.TwoHandSword
-                                  or WeaponType.Staff;
+                bool newWeaponIs2H = runItem.Item.WeaponType is WeaponType.TwoHandSword or WeaponType.Staff;
                 if (newWeaponIs2H)
                 {
-                    // 2H takılınca mevcut offhand'ı unequip et
-                    await UnequipSlot(runId, ItemSlot.Offhand);
+                    // Offhand takılıysa önce çıkarılmasını zorunlu kıl
+                    var hasOffhand = await _context.RunEquipments
+                        .AnyAsync(e => e.RunId == runId && e.OffhandId != null);
+                    if (hasOffhand)
+                        return false;  // ✅ Sessizce başarısız yerine false döndür
                 }
             }
 
