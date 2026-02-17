@@ -22,19 +22,61 @@ namespace AtlasRPG.Application.Services
             _random = new Random();
         }
 
-        public async Task<List<Item>> GenerateShopInventory(int currentTurn)
+        // Eski imza: GenerateShopInventory(int currentTurn)
+        // YENİ imza: Run nesnesi alır — cache için
+        public async Task<List<Item>> GenerateShopInventory(Run run)
         {
-            var shopItems = new List<Item>();
+            // ✅ Aynı turn için cache'den dön
+            if (run.ShopLastGeneratedTurn == run.CurrentTurn
+                && !string.IsNullOrEmpty(run.ShopItemIdsJson)
+                && run.ShopItemIdsJson != "[]")
+            {
+                var cachedIds = System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(run.ShopItemIdsJson)
+                                ?? new List<Guid>();
 
+                if (cachedIds.Any())
+                {
+                    // ✅ Contains yerine tek tek yükle — SQL CTE hatasını önler
+                    var cachedItems = new List<Item>();
+                    foreach (var cid in cachedIds)
+                    {
+                        var item = await _context.Items
+                            .Include(i => i.Affixes)
+                                .ThenInclude(a => a.AffixDefinition)
+                            .FirstOrDefaultAsync(i => i.Id == cid);
+
+                        if (item != null)
+                            cachedItems.Add(item);
+                    }
+
+                    if (cachedItems.Count > 0)
+                        return cachedItems;
+                }
+            }
+
+            // ✅ Yeni shop üret
+            var shopItems = new List<Item>();
             for (int i = 0; i < 5; i++)
             {
-                var rarity = DetermineShopRarity(currentTurn);
+                var rarity = DetermineShopRarity(run.CurrentTurn);
                 var slot = GetRandomSlot();
+                var item = await _itemGenerator.GenerateShopItem(slot, run.CurrentTurn, rarity);
 
-                // ✅ DÜZELTİLDİ: GenerateShopItem kullan — tüm weapon tipleri çıkar
-                var item = await _itemGenerator.GenerateShopItem(slot, currentTurn, rarity);
+                // Affixleri yükle
+                await _context.Entry(item)
+                    .Collection(x => x.Affixes)
+                    .Query()
+                    .Include(a => a.AffixDefinition)
+                    .LoadAsync();
+
                 shopItems.Add(item);
             }
+
+            // ✅ Cache'e kaydet
+            run.ShopLastGeneratedTurn = run.CurrentTurn;
+            run.ShopItemIdsJson = System.Text.Json.JsonSerializer.Serialize(
+                shopItems.Select(i => i.Id).ToList());
+            await _context.SaveChangesAsync();
 
             return shopItems;
         }
