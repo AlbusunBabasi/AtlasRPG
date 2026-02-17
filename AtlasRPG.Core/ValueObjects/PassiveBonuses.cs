@@ -1,4 +1,4 @@
-﻿// AtlasRPG.Core/ValueObjects/PassiveBonuses.cs
+// AtlasRPG.Core/ValueObjects/PassiveBonuses.cs
 namespace AtlasRPG.Core.ValueObjects
 {
     /// <summary>
@@ -142,6 +142,9 @@ namespace AtlasRPG.Core.ValueObjects
 
         /// <summary>Burn tick damage çarpanı (N60 Pyromancer Keystone → 1.15)</summary>
         public decimal BurnTickMult { get; set; } = 1.0m;
+
+        public int DebuffDurationReduction { get; set; } = 0;  // Dwarf Steadfast
+        public bool DraconicCoreActive { get; set; } = false;  // Drakoid Draconic Core
 
         // ────────────────────────────────────────────
         // HELPER: Weapon tipini string olarak al
