@@ -57,48 +57,42 @@ namespace AtlasRPG.Application.Services
         public static decimal TickStatusEffects(CharacterStats character)
         {
             decimal totalDamage = 0m;
-            var toRemove = new List<ActiveStatusEffect>();
 
-            foreach (var effect in character.StatusEffects)
+            foreach (var effect in character.StatusEffects.ToList())
             {
+                // ✅ Stun'u TickStatusEffects'te decrement ETME
+                // Stun süresi CombatService'teki counter tarafından yönetilir
+                if (effect.Type == "Stun")
+                {
+                    // Sadece temizle, hasar hesaplama
+                    continue;
+                }
+
+                // DOT efektleri (Bleed, Poison, Burn)
                 switch (effect.Type)
                 {
                     case "Bleed":
-                        // True damage — armor/resist geçmez
                         totalDamage += effect.TickValue * effect.CurrentStacks;
                         break;
-
                     case "Poison":
-                        // True damage — % of current HP
                         totalDamage += character.CurrentHp * effect.TickPercent;
                         break;
-
                     case "Burn":
-                        // FireResist uygulanır, Ward absorbs
-                        decimal burnTick = character.CurrentHp * 0.03m * effect.CurrentStacks;
-                        burnTick *= (1m - character.FireResist);
-                        if (effect.WardAbsorbs && character.Ward > 0)
-                        {
-                            decimal absorbed = Math.Min(character.Ward, burnTick);
-                            character.Ward -= absorbed;
-                            burnTick -= absorbed;
-                        }
+                        decimal burnTick = character.CurrentHp * 0.03m;
+                        // FireResist uygula
+                        burnTick *= (1 - character.FireResist);
                         totalDamage += burnTick;
                         break;
                 }
 
                 effect.RemainingRounds--;
                 if (effect.RemainingRounds <= 0)
-                    toRemove.Add(effect);
+                    character.StatusEffects.Remove(effect);
             }
 
-            foreach (var e in toRemove)
-                character.StatusEffects.Remove(e);
-
-            // Stun bir round sonra sıfırlanır
-            // UI icin: stun state'ini status listesine gore tut (combat kararinda tek kaynak olmamali)
-            character.IsStunned = character.StatusEffects.Any(e => e.Type == "Stun" && e.RemainingRounds > 0);
-
+            // ✅ IsStunned artık CombatService counter'dan türetilmeli
+            // (bu satırı kaldır):
+            // character.IsStunned = character.StatusEffects.Any(e => e.Type == "Stun" && e.RemainingRounds > 0);
 
             return totalDamage;
         }
@@ -218,23 +212,17 @@ namespace AtlasRPG.Application.Services
                         break;
 
                     case "applyStun":
-                        // Stun: CombatService tarafinda defenderStunRoundsRemaining sayacina map edilir.
-                        // Bu nedenle burada IsStunned bool'u yerine StatusEffect ekliyoruz.
-                        double stunChance = data.TryGetProperty("chance", out var sc)
-                            ? sc.GetDouble() : 1.0;
+                        double stunChance = data.TryGetProperty("chance", out var sc) ? sc.GetDouble() : 1.0;
+                        if (_rng.NextDouble() >= stunChance) break;  // Chance check
 
-                        int dur = data.TryGetProperty("duration", out var sd)
-                            ? sd.GetInt32() : 1;
+                        int dur = data.TryGetProperty("duration", out var sd) ? sd.GetInt32() : 1;
 
-                        if (_rng.NextDouble() < stunChance)
+                        AddOrRefreshStatus(target.StatusEffects, new ActiveStatusEffect
                         {
-                            AddOrRefreshStatus(target.StatusEffects, new ActiveStatusEffect
-                            {
-                                Type = "Stun",
-                                RemainingRounds = dur,
-                                MaxStacks = 1
-                            });
-                        }
+                            Type = "Stun",
+                            RemainingRounds = dur,  // TickStatusEffects Stun'u decrement etmiyorsa bu yeterli
+                            MaxStacks = 1
+                        });
                         break;
 
 
@@ -335,6 +323,7 @@ namespace AtlasRPG.Application.Services
 
             return true;
         }
+
 
         private static void ApplyBuff(
             CharacterStats caster, string type,
