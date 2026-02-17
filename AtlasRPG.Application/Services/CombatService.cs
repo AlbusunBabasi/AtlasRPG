@@ -166,12 +166,40 @@ namespace AtlasRPG.Application.Services
                 {
                     if (!playerIsStunned)
                     {
-                        ExecuteActionWithPassives(
-                            playerStats, opponentStats, playerAction, playerMultiplier,
-                            round, isPlayer: true, attackerGoesFirst: playerHasFirstStrike,
-                            ref opponentFirstHitReceived,
-                            activeSkill: playerAction != "BasicAttack" ? activeSkill : null,
-                            ref opponentStunRoundsRemaining);
+                        // ── MultiHit kontrolü ──────────────────────────
+                        int hitCount = 1;
+                        decimal eachHitMulti = 1.0m;
+                        if (playerAction != "BasicAttack"
+                            && activeSkill?.EffectJson != null
+                            && activeSkill.EffectJson != "{}")
+                        {
+                            try
+                            {
+                                var jdoc = System.Text.Json.JsonDocument.Parse(activeSkill.EffectJson);
+                                if (jdoc.RootElement.TryGetProperty("multiHit", out var mh))
+                                {
+                                    if (mh.TryGetProperty("hits", out var hitsEl))
+                                        hitCount = hitsEl.GetInt32();
+                                    if (mh.TryGetProperty("eachHitMulti", out var ehm))
+                                        eachHitMulti = ehm.GetDecimal();
+                                }
+                            }
+                            catch { }
+                        }
+
+                        for (int hitIdx = 0; hitIdx < hitCount; hitIdx++)
+                        {
+                            decimal thisMultiplier = playerMultiplier * (eachHitMulti > 0 ? eachHitMulti : 1.0m);
+
+                            ExecuteActionWithPassives(
+                                playerStats, opponentStats, playerAction, thisMultiplier,
+                                round, isPlayer: true, attackerGoesFirst: playerHasFirstStrike,
+                                ref opponentFirstHitReceived,
+                                activeSkill: playerAction != "BasicAttack" ? activeSkill : null,
+                                ref opponentStunRoundsRemaining);
+
+                            if (opponentStats.CurrentHp <= 0) break;
+                        }
                     }
                     else
                     {
@@ -243,12 +271,40 @@ namespace AtlasRPG.Application.Services
                     {
                         if (!playerIsStunned)
                         {
-                            ExecuteActionWithPassives(
-                                playerStats, opponentStats, playerAction, playerMultiplier,
-                                round, isPlayer: true, attackerGoesFirst: playerHasFirstStrike,
-                                ref opponentFirstHitReceived,
-                                activeSkill: playerAction != "BasicAttack" ? activeSkill : null,
-                                ref opponentStunRoundsRemaining);
+                            // ── MultiHit kontrolü ──────────────────────────
+                            int hitCount2 = 1;
+                            decimal eachHitMulti2 = 1.0m;
+                            if (playerAction != "BasicAttack"
+                                && activeSkill?.EffectJson != null
+                                && activeSkill.EffectJson != "{}")
+                            {
+                                try
+                                {
+                                    var jdoc2 = System.Text.Json.JsonDocument.Parse(activeSkill.EffectJson);
+                                    if (jdoc2.RootElement.TryGetProperty("multiHit", out var mh2))
+                                    {
+                                        if (mh2.TryGetProperty("hits", out var hitsEl2))
+                                            hitCount2 = hitsEl2.GetInt32();
+                                        if (mh2.TryGetProperty("eachHitMulti", out var ehm2))
+                                            eachHitMulti2 = ehm2.GetDecimal();
+                                    }
+                                }
+                                catch { }
+                            }
+
+                            for (int hitIdx2 = 0; hitIdx2 < hitCount2; hitIdx2++)
+                            {
+                                decimal thisMultiplier2 = playerMultiplier * (eachHitMulti2 > 0 ? eachHitMulti2 : 1.0m);
+
+                                ExecuteActionWithPassives(
+                                    playerStats, opponentStats, playerAction, thisMultiplier2,
+                                    round, isPlayer: true, attackerGoesFirst: playerHasFirstStrike,
+                                    ref opponentFirstHitReceived,
+                                    activeSkill: playerAction != "BasicAttack" ? activeSkill : null,
+                                    ref opponentStunRoundsRemaining);
+
+                                if (opponentStats.CurrentHp <= 0) break;
+                            }
                         }
                         else
                         {
@@ -364,6 +420,15 @@ namespace AtlasRPG.Application.Services
 
             defender.CurrentHp -= action.FinalDamage;
 
+            // ✅ Lifesteal — sadece hit olursa ve gerçek hasar varsa
+            if (action.DidHit && action.FinalDamage > 0 && pPb.LifeSteal > 0)
+            {
+                decimal healAmount = action.FinalDamage * pPb.LifeSteal;
+                attacker.CurrentHp = Math.Min(attacker.MaxHp, attacker.CurrentHp + healAmount);
+                round.EventLog = AppendLog(round.EventLog,
+                    $"💚 Lifesteal +{healAmount:F1} HP");
+            }
+
             // ✅ Flat Elemental Damage — ayrı hit, Resist mitigation uygulanır, Armor uygulanmaz
             decimal totalElementalDmg = 0m;
 
@@ -423,18 +488,18 @@ namespace AtlasRPG.Application.Services
             if (isPlayer)
             {
                 round.PlayerAction = actionName;
-                round.PlayerHit = action.DidHit;
-                round.PlayerCrit = action.DidCrit;
-                round.PlayerDamage = action.FinalDamage;
-                round.PlayerBlocked = action.WasBlocked;
+                round.PlayerHit = round.PlayerHit || action.DidHit;      // ✅ en az biri hit olduysa true
+                round.PlayerCrit = round.PlayerCrit || action.DidCrit;   // ✅ en az biri crit olduysa true
+                round.PlayerDamage += action.FinalDamage;                // ✅ = yerine += (topla)
+                round.PlayerBlocked = round.PlayerBlocked || action.WasBlocked;
             }
             else
             {
                 round.OpponentAction = actionName;
-                round.OpponentHit = action.DidHit;
-                round.OpponentCrit = action.DidCrit;
-                round.OpponentDamage = action.FinalDamage;
-                round.OpponentBlocked = action.WasBlocked;
+                round.OpponentHit = round.OpponentHit || action.DidHit;
+                round.OpponentCrit = round.OpponentCrit || action.DidCrit;
+                round.OpponentDamage += action.FinalDamage;              // ✅ += 
+                round.OpponentBlocked = round.OpponentBlocked || action.WasBlocked;
             }
         }
 
