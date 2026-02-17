@@ -118,6 +118,19 @@ namespace AtlasRPG.Application.Services
                     break;
                 }
 
+                if (playerStunRoundsRemaining > 0 &&
+                    !playerStats.StatusEffects.Any(e => e.Type == "Stun"))
+                {
+                    // Counter'ı sıfırla (StatusEffect zaten yok)
+                    playerStunRoundsRemaining = 0;
+                }
+                if (opponentStunRoundsRemaining > 0 &&
+                    !opponentStats.StatusEffects.Any(e => e.Type == "Stun"))
+                {
+                    // Counter'ı sıfırla
+                    opponentStunRoundsRemaining = 0;
+                }
+
                 // Stun: bu roundda skip mi?
                 bool playerIsStunned = playerStunRoundsRemaining > 0;
                 bool opponentIsStunned = opponentStunRoundsRemaining > 0;
@@ -167,7 +180,15 @@ namespace AtlasRPG.Application.Services
                         if (playerStunRoundsRemaining > 0) playerStunRoundsRemaining--;
                     }
 
-                    // ✅ player aksiyonundan sonra stun yemis olabilir
+                    // ✅ YENİ: Player aksiyonu sonrası death check
+                    if (opponentStats.CurrentHp <= 0)
+                    {
+                        round.PlayerHpRemaining = playerStats.CurrentHp;
+                        round.OpponentHpRemaining = opponentStats.CurrentHp;
+                        combatResult.Rounds.Add(round);
+                        break;
+                    }
+
                     opponentIsStunned = opponentStunRoundsRemaining > 0;
 
                     if (opponentStats.CurrentHp > 0)
@@ -177,7 +198,8 @@ namespace AtlasRPG.Application.Services
                             ExecuteActionWithPassives(
                                 opponentStats, playerStats, opponentAction, opponentMultiplier,
                                 round, isPlayer: false, attackerGoesFirst: !playerHasFirstStrike,
-                                ref playerFirstHitReceived, activeSkill: null,
+                                ref playerFirstHitReceived,
+                                activeSkill: null,
                                 ref playerStunRoundsRemaining);
                         }
                         else
@@ -188,14 +210,15 @@ namespace AtlasRPG.Application.Services
                         }
                     }
                 }
-                else
+                else // opponent önce saldırır
                 {
                     if (!opponentIsStunned)
                     {
                         ExecuteActionWithPassives(
                             opponentStats, playerStats, opponentAction, opponentMultiplier,
                             round, isPlayer: false, attackerGoesFirst: !playerHasFirstStrike,
-                            ref playerFirstHitReceived, activeSkill: null,
+                            ref playerFirstHitReceived,
+                            activeSkill: null,
                             ref playerStunRoundsRemaining);
                     }
                     else
@@ -205,7 +228,15 @@ namespace AtlasRPG.Application.Services
                         if (opponentStunRoundsRemaining > 0) opponentStunRoundsRemaining--;
                     }
 
-                    // ✅ opponent aksiyonundan sonra player stun yemis olabilir
+                    // ✅ YENİ: Opponent aksiyonu sonrası death check
+                    if (playerStats.CurrentHp <= 0)
+                    {
+                        round.PlayerHpRemaining = playerStats.CurrentHp;
+                        round.OpponentHpRemaining = opponentStats.CurrentHp;
+                        combatResult.Rounds.Add(round);
+                        break;
+                    }
+
                     playerIsStunned = playerStunRoundsRemaining > 0;
 
                     if (playerStats.CurrentHp > 0)
@@ -332,6 +363,62 @@ namespace AtlasRPG.Application.Services
             }
 
             defender.CurrentHp -= action.FinalDamage;
+
+            // ✅ Flat Elemental Damage — ayrı hit, Resist mitigation uygulanır, Armor uygulanmaz
+            decimal totalElementalDmg = 0m;
+
+            if (action.DidHit)  // sadece hit olduysa elemental de çarpar
+            {
+                void ApplyFlat(decimal flatDmg, string dmgType)
+                {
+                    if (flatDmg <= 0) return;
+                    decimal resist = dmgType switch
+                    {
+                        "Fire" => defender.FireResist,
+                        "Cold" => defender.ColdResist,
+                        "Lightning" => defender.LightningResist,
+                        "Chaos" => defender.ChaosResist,
+                        _ => 0m
+                    };
+                    // Crit elemental'a da uygulanır
+                    decimal dmg = flatDmg * (action.DidCrit ? attacker.CritMultiplier : 1m);
+                    // Ward absorbs non-physical
+                    decimal afterResist = dmg * (1 - resist);
+                    if (defender.Ward > 0)
+                    {
+                        decimal wa = Math.Min(defender.Ward, afterResist);
+                        afterResist -= wa;
+                        if (isPlayer) round.PlayerWardAbsorbed += wa;
+                        else round.OpponentWardAbsorbed += wa;
+                    }
+                    totalElementalDmg += afterResist;
+                }
+
+                ApplyFlat(attacker.FlatFireDamage, "Fire");
+                ApplyFlat(attacker.FlatColdDamage, "Cold");
+                ApplyFlat(attacker.FlatLightningDamage, "Lightning");
+                ApplyFlat(attacker.FlatChaosDamage, "Chaos");
+
+                if (totalElementalDmg > 0)
+                {
+                    defender.CurrentHp -= totalElementalDmg;
+                    if (isPlayer) round.PlayerDamage += totalElementalDmg;
+                    else round.OpponentDamage += totalElementalDmg;
+
+                    round.EventLog = AppendLog(round.EventLog,
+                        $"⚡ Elemental: -{totalElementalDmg:F1}");
+                }
+            }
+
+            // ✅ Ward absorbed değerini round'a yaz
+            if (isPlayer)
+            {
+                round.PlayerWardAbsorbed += action.WardAbsorbed;
+            }
+            else
+            {
+                round.OpponentWardAbsorbed += action.WardAbsorbed;
+            }
 
             if (isPlayer)
             {
