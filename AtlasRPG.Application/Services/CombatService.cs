@@ -97,18 +97,31 @@ namespace AtlasRPG.Application.Services
                 }
 
                 // Round basi DOT tick
+                // Round basi DOT tick
+                // ✅ Tick'ten ÖNCE statüsleri kaydet (display için)
+                string playerStatusesBefore = string.Join(",",
+                    playerStats.StatusEffects.Select(e => e.Type).Distinct());
+                string opponentStatusesBefore = string.Join(",",
+                    opponentStats.StatusEffects.Select(e => e.Type).Distinct());
+
+                // Round basi DOT tick
                 decimal playerDotDmg = SkillEffectApplier.TickStatusEffects(playerStats);
                 decimal opponentDotDmg = SkillEffectApplier.TickStatusEffects(opponentStats);
                 playerStats.CurrentHp -= playerDotDmg;
                 opponentStats.CurrentHp -= opponentDotDmg;
 
-                if (playerDotDmg > 0 || opponentDotDmg > 0)
-                {
-                    string dotLog = "";
-                    if (playerDotDmg > 0) dotLog += $"DOT->Player: -{playerDotDmg:F0} | ";
-                    if (opponentDotDmg > 0) dotLog += $"DOT->Opp: -{opponentDotDmg:F0}";
-                    round.EventLog = AppendLog(round.EventLog, dotLog.TrimEnd(' ', '|'));
-                }
+                // ✅ Round'a yaz
+                round.PlayerDotDamage = playerDotDmg;
+                round.OpponentDotDamage = opponentDotDmg;
+                round.ActivePlayerStatuses = playerStatusesBefore;   // tick öncesi — label doğru görünsün
+                round.ActiveOpponentStatuses = opponentStatusesBefore;
+
+
+                // ✅ Aktif status'leri yaz (display için)
+                round.ActivePlayerStatuses = string.Join(",",
+                    playerStats.StatusEffects.Select(e => e.Type).Distinct());
+                round.ActiveOpponentStatuses = string.Join(",",
+                    opponentStats.StatusEffects.Select(e => e.Type).Distinct());
 
                 if (playerStats.CurrentHp <= 0 || opponentStats.CurrentHp <= 0)
                 {
@@ -374,6 +387,15 @@ namespace AtlasRPG.Application.Services
                     attacker.StatusEffects.Remove(chargeEffect);
             }
 
+            // ✅ Riposte buff (CounterMove sonrası)
+            var riposteEffect = attacker.StatusEffects.FirstOrDefault(e => e.Type == "Riposte");
+            if (riposteEffect != null)
+            {
+                bonusMult *= riposteEffect.DamageBonusMult;
+                attacker.StatusEffects.Remove(riposteEffect); // tek kullanımlık
+                round.EventLog = AppendLog(round.EventLog, "⚔️ Riposte!");
+            }
+
             var action = _damageCalculator.CalculateAttack(
                 attacker, defender, actionName, multiplier * bonusMult);
 
@@ -414,6 +436,33 @@ namespace AtlasRPG.Application.Services
                     takenMult *= dPb.LowHpDamageTakenMult;
                 if (action.WasBlocked && dPb.BlockSuccessDamageTakenMult < 1.0m)
                     takenMult *= dPb.BlockSuccessDamageTakenMult;
+                // ✅ CounterStance → Riposte proc
+                if (action.WasBlocked)
+                {
+                    var counterStance = attacker.StatusEffects  // dikkat: defender saldırıldı, attacker = rakip
+                        .FirstOrDefault(e => e.Type == "CounterStance");
+
+                    // Aslında defender'ın counterStance'ı var — block eden defender
+                    var defCounterStance = defender.StatusEffects
+                        .FirstOrDefault(e => e.Type == "CounterStance");
+
+                    if (defCounterStance != null)
+                    {
+                        // Riposte buff'ı defender'a (block eden kişiye) ver
+                        var existing = defender.StatusEffects.FirstOrDefault(e => e.Type == "Riposte");
+                        if (existing == null)
+                        {
+                            defender.StatusEffects.Add(new ActiveStatusEffect
+                            {
+                                Type = "Riposte",
+                                RemainingRounds = 1,
+                                DamageBonusMult = 1.20m,  // +%20 next attack
+                                MaxStacks = 1
+                            });
+                        }
+                        round.EventLog = AppendLog(round.EventLog, "🛡️ CounterStance → Riposte!");
+                    }
+                }
 
                 action.FinalDamage *= takenMult;
             }
@@ -425,8 +474,9 @@ namespace AtlasRPG.Application.Services
             {
                 decimal healAmount = action.FinalDamage * pPb.LifeSteal;
                 attacker.CurrentHp = Math.Min(attacker.MaxHp, attacker.CurrentHp + healAmount);
-                round.EventLog = AppendLog(round.EventLog,
-                    $"💚 Lifesteal +{healAmount:F1} HP");
+                // ✅ EventLog yerine round'a yaz
+                if (isPlayer) round.PlayerLifesteal += healAmount;
+                else round.OpponentLifesteal += healAmount;
             }
 
             // ✅ Flat Elemental Damage — ayrı hit, Resist mitigation uygulanır, Armor uygulanmaz
@@ -467,11 +517,8 @@ namespace AtlasRPG.Application.Services
                 if (totalElementalDmg > 0)
                 {
                     defender.CurrentHp -= totalElementalDmg;
-                    if (isPlayer) round.PlayerDamage += totalElementalDmg;
-                    else round.OpponentDamage += totalElementalDmg;
-
-                    round.EventLog = AppendLog(round.EventLog,
-                        $"⚡ Elemental: -{totalElementalDmg:F1}");
+                    if (isPlayer) { round.PlayerDamage += totalElementalDmg; round.PlayerElementalDamage += totalElementalDmg; }
+                    else { round.OpponentDamage += totalElementalDmg; round.OpponentElementalDamage += totalElementalDmg; }
                 }
             }
 
