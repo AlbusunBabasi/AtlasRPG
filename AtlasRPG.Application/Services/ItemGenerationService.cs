@@ -307,15 +307,15 @@ namespace AtlasRPG.Application.Services
         /// Belirli sayıda, mevcut key'leri hariç tutarak affix ekler (Upgrade için).
         /// </summary>
         public async Task GenerateAffixesWithCount(
-            Item item,
-            int count,
-            int itemLevel,
-            HashSet<string> existingKeys)
+            Item item, int count, int itemLevel, HashSet<string> existingKeys)
         {
             string slotKey = GetSlotKey(item);
 
+            // ✅ Hem spesifik (Shield/Focus/Quiver) hem genel "Offhand" affixleri dahil et
             var eligibleAffixes = await _context.AffixDefinitions
-                .Where(a => a.AllowedSlots.Contains(slotKey))
+                .Where(a => a.AllowedSlots.Contains(slotKey)
+                         || (item.Slot == ItemSlot.Offhand && a.AllowedSlots.Contains("Offhand"))
+                         || (item.Slot == ItemSlot.Offhand && a.AllowedSlots.Contains("Weapon")))
                 .ToListAsync();
 
             for (int i = 0; i < count; i++)
