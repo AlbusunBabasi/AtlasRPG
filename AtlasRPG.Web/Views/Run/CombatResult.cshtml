@@ -28,14 +28,24 @@
                 r.PlayerHit,
                 r.PlayerCrit,
                 r.PlayerBlocked,
+                PlayerDotDamage = (double)r.PlayerDotDamage,
+                ActivePlayerStatuses = r.ActivePlayerStatuses,
                 PlayerDamage = (double)r.PlayerDamage,
                 PlayerHpRemaining = (double)r.PlayerHpRemaining,
+                PlayerWardAbsorbed = (double)r.PlayerWardAbsorbed,
+                PlayerLifesteal = (double)r.PlayerLifesteal,
+                PlayerElementalDamage = (double)r.PlayerElementalDamage,
                 r.OpponentAction,
                 r.OpponentHit,
                 r.OpponentCrit,
                 r.OpponentBlocked,
                 OpponentDamage = (double)r.OpponentDamage,
+                OpponentDotDamage = (double)r.OpponentDotDamage,
+                ActiveOpponentStatuses = r.ActiveOpponentStatuses,
                 OpponentHpRemaining = (double)r.OpponentHpRemaining,
+                OpponentWardAbsorbed = (double)r.OpponentWardAbsorbed,
+                OpponentLifesteal = (double)r.OpponentLifesteal,
+                OpponentElementalDamage = (double)r.OpponentElementalDamage,
                 r.EventLog
             }),
             new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
@@ -914,12 +924,18 @@
                 <div class="hpt"><span id="pht">—</span></div>
                 <div class="sr" id="psr"></div>
             </div>
+            <div class="hbw" id="pward-wrap" style="display:none; margin-top:3px;">
+                <div class="hbf" id="pward" style="width:100%; background:linear-gradient(90deg,#6655cc,#8877ff);"></div>
+            </div>
             <div class="vs">VS</div>
             <div class="fp ep">
                 <div class="fpn">@(Model.OpponentUsername ?? (isPve ? "🐉 Monster" : "🤖 Opponent")) ⚔</div>
                 <div class="hbw"><div class="hbf" id="ehp" style="width:100%"></div></div>
                 <div class="hpt"><span id="eht">—</span></div>
                 <div class="sr" id="esr"></div>
+            </div>
+            <div class="hbw" id="eward-wrap" style="display:none; margin-top:3px;">
+                <div class="hbf" id="eward" style="width:100%; background:linear-gradient(90deg,#6655cc,#8877ff);"></div>
             </div>
         </div>
 
@@ -999,283 +1015,331 @@
         const ROUNDS = @Html.Raw(roundsJson);
         const PMAX = @Html.Raw(((double)estPlayerMaxHp).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
         const EMAX = @Html.Raw(((double)estOpponentMaxHp).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+        const PWMAX = @Html.Raw(((double)sortedRounds.Sum(r => r.PlayerWardAbsorbed)).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+        const EWMAX = @Html.Raw(((double)sortedRounds.Sum(r => r.OpponentWardAbsorbed)).ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+
+        let pWardCur = PWMAX;
+        let eWardCur = EWMAX;
+
+        function initWardBars() {
+            if (PWMAX > 0) { document.getElementById('pward-wrap').style.display = 'block'; document.getElementById('pward').style.width = '100%'; }
+            if (EWMAX > 0) { document.getElementById('eward-wrap').style.display = 'block'; document.getElementById('eward').style.width = '100%'; }
+        }
+
+        function updateWard(side, absorbed) {
+            if (absorbed <= 0) return;
+            if (side === 'p') {
+                pWardCur = Math.max(0, pWardCur - absorbed);
+                document.getElementById('pward').style.width = (PWMAX > 0 ? (pWardCur / PWMAX * 100) : 0) + '%';
+            } else {
+                eWardCur = Math.max(0, eWardCur - absorbed);
+                document.getElementById('eward').style.width = (EWMAX > 0 ? (eWardCur / EWMAX * 100) : 0) + '%';
+            }
+        }
 
         // Known skill → status procs
         const PROCS = {
-          QuickSlash:        [{ s:"Bleed",      d:2,  p:.20        }],
-          WeakPoint:         [{ s:"ArmorShred", d:2,  p:1.0        }],
-          CrossStrike:       [{ s:"Bleed",      d:2,  p:1.0        }],
-          Sunder:            [{ s:"Bleed",      d:3,  p:.40        }],
-          BleedingShot:      [{ s:"Bleed",      d:2,  p:1.0        }],
-          VenomousStrike:    [{ s:"Poison",     d:3,  p:1.0        }],
-          DimFlame:          [{ s:"Burn",       d:3,  p:.50        }],
-          FireBall:          [{ s:"Burn",       d:3,  p:.30        }],
-          Combustion:        [{ s:"Burn",       d:3,  p:1.0        }],
-          AshStrike:         [{ s:"AshCloud",   d:2,  p:1.0        }],
-          Paralyze:          [{ s:"Paralyze",   d:2,  p:1.0        }, { s:"Stun", d:1, p:.35 }],
-          SwordDance:        [{ s:"SwordDance", d:2,  p:1.0, b:1   }],
-          HuntersFocus:      [{ s:"HunterFocus",d:3,  p:1.0, b:1   }],
-          ColossusStance:    [{ s:"ColossusStance",d:3,p:1.0,b:1   }],
-          ShadowStep:        [{ s:"ShadowStep", d:1,  p:1.0, b:1   }],
-          StaticCharge:      [{ s:"StaticCharge",d:3, p:1.0, b:1   }],
-          AshArmor:          [{ s:"AshArmor",   d:3,  p:1.0, b:1   }],
-          ArmorPiercingArrow:[{ s:"Mark",       d:3,  p:1.0        }],
+            QuickSlash:         [{ s:"Bleed",       d:2, p:.20      }],
+            WeakPoint:          [{ s:"ArmorShred",   d:2, p:1.0     }],
+            CrossStrike:        [{ s:"Bleed",        d:2, p:1.0     }],
+            Sunder:             [{ s:"Bleed",        d:3, p:.40     }],
+            BleedingShot:       [{ s:"Bleed",        d:2, p:1.0     }],
+            VenomousStrike:     [{ s:"Poison",       d:3, p:1.0     }],
+            DimFlame:           [{ s:"Burn",         d:3, p:.50     }],
+            FireBall:           [{ s:"Burn",         d:3, p:.30     }],
+            Combustion:         [{ s:"Burn",         d:3, p:1.0     }],
+            AshStrike:          [{ s:"AshCloud",     d:2, p:1.0     }],
+            Paralyze:           [{ s:"Paralyze",     d:2, p:1.0     }, { s:"Stun", d:1, p:.35 }],
+            SwordDance:         [{ s:"SwordDance",   d:2, p:1.0, b:1}],
+            HuntersFocus:       [{ s:"HunterFocus",  d:3, p:1.0, b:1}],
+            ColossusStance:     [{ s:"ColossusStance",d:3,p:1.0, b:1}],
+            ShadowStep:         [{ s:"ShadowStep",   d:1, p:1.0, b:1}],
+            StaticCharge:       [{ s:"StaticCharge", d:3, p:1.0, b:1}],
+            AshArmor:           [{ s:"AshArmor",     d:3, p:1.0, b:1}],
+            ArmorPiercingArrow: [{ s:"Mark",         d:3, p:1.0     }],
+            CounterMove:        [{ s:"CounterStance",d:2, p:1.0, b:1}],
         };
 
         const ICO = {
-          Bleed:"🩸",Burn:"🔥",Poison:"☠️",Stun:"💫",ArmorShred:"🛡️",
-          AshCloud:"🌫️",Mark:"🎯",Paralyze:"⚡",SwordDance:"💃",
-          HunterFocus:"👁️",ColossusStance:"🗿",ShadowStep:"👤",
-          StaticCharge:"⚡",AshArmor:"🪨",
+            Bleed:"🩸", Burn:"🔥", Poison:"☠️", Stun:"💫", ArmorShred:"🛡️",
+            AshCloud:"🌫️", Mark:"🎯", Paralyze:"⚡", SwordDance:"💃",
+            HunterFocus:"👁️", ColossusStance:"🗿", ShadowStep:"👤",
+            StaticCharge:"⚡", AshArmor:"🪨", CounterStance:"🛡️", Riposte:"⚔️",
         };
 
         const SCLS = {
-          Bleed:"sb",Burn:"su",Poison:"sp",Stun:"ss",Paralyze:"ss",
-          Mark:"sm",ArmorShred:"sh",AshCloud:"sa",
-          SwordDance:"sf",HunterFocus:"sf",ColossusStance:"sf",
-          ShadowStep:"sf",StaticCharge:"sf",AshArmor:"sf",
+            Bleed:"sb", Burn:"su", Poison:"sp", Stun:"ss", Paralyze:"ss",
+            Mark:"sm", ArmorShred:"sh", AshCloud:"sa",
+            SwordDance:"sf", HunterFocus:"sf", ColossusStance:"sf",
+            ShadowStep:"sf", StaticCharge:"sf", AshArmor:"sf", CounterStance:"sf",
         };
 
         const PCOL = {
-          Bleed:"var(--bl)",Burn:"var(--bu)",Poison:"var(--po)",
-          Stun:"var(--st)",Paralyze:"var(--st)",Mark:"#ffa030",
-          ArmorShred:"#c8c030",AshCloud:"#a0a0c0",
+            Bleed:"var(--bl)", Burn:"var(--bu)", Poison:"var(--po)",
+            Stun:"var(--st)", Paralyze:"var(--st)", Mark:"#ffa030",
+            ArmorShred:"#c8c030", AshCloud:"#a0a0c0",
         };
 
         // ── STATE
         let pSt = {}, eSt = {};
 
         // ── UTILS
-        const slp = ms => new Promise(r => setTimeout(r,ms));
+        const slp = ms => new Promise(r => setTimeout(r, ms));
 
-        function aname(n){
-          if(n==="BasicAttack") return "Basic Attack";
-          return n.replace(/([A-Z])/g,' $1').trim();
+        function aname(n) {
+            if (n === "BasicAttack") return "Basic Attack";
+            return n.replace(/([A-Z])/g, ' $1').trim();
         }
 
-        function aicon(n){
-          const l=n.toLowerCase();
-          if(n==="BasicAttack") return "⚔️";
-          if(l.includes("stab")||l.includes("slash")) return "🗡️";
-          if(l.includes("fire")||l.includes("flame")||l.includes("burn")||l.includes("combustion")) return "🔥";
-          if(l.includes("arrow")||l.includes("shot")) return "🏹";
-          if(l.includes("shadow")||l.includes("step")) return "👤";
-          if(l.includes("stance")||l.includes("colossus")) return "🛡️";
-          if(l.includes("lightning")||l.includes("spark")||l.includes("chain")||l.includes("static")) return "⚡";
-          if(l.includes("poison")||l.includes("venom")) return "☠️";
-          if(l.includes("dance")) return "💃";
-          if(l.includes("focus")||l.includes("hunter")) return "🎯";
-          if(l.includes("ash")||l.includes("cloud")) return "🌫️";
-          if(l.includes("sunder")||l.includes("bleed")||l.includes("cross")) return "🩸";
-          if(l.includes("paralyze")||l.includes("stun")) return "⚡";
-          if(l.includes("weak")||l.includes("point")) return "🎯";
-          if(l.includes("armor")||l.includes("piercing")) return "🏹";
-          return "✨";
+        function aicon(n) {
+            const l = n.toLowerCase();
+            if (n === "BasicAttack") return "⚔️";
+            if (l.includes("stab") || l.includes("slash")) return "🗡️";
+            if (l.includes("fire") || l.includes("flame") || l.includes("burn") || l.includes("combustion")) return "🔥";
+            if (l.includes("arrow") || l.includes("shot")) return "🏹";
+            if (l.includes("shadow") || l.includes("step")) return "👤";
+            if (l.includes("stance") || l.includes("colossus") || l.includes("counter")) return "🛡️";
+            if (l.includes("lightning") || l.includes("spark") || l.includes("chain") || l.includes("static")) return "⚡";
+            if (l.includes("poison") || l.includes("venom")) return "☠️";
+            if (l.includes("dance")) return "💃";
+            if (l.includes("focus") || l.includes("hunter")) return "🎯";
+            if (l.includes("ash") || l.includes("cloud")) return "🌫️";
+            if (l.includes("sunder") || l.includes("bleed") || l.includes("cross")) return "🩸";
+            if (l.includes("paralyze") || l.includes("stun")) return "⚡";
+            if (l.includes("weak") || l.includes("point")) return "🎯";
+            if (l.includes("armor") || l.includes("piercing")) return "🏹";
+            return "✨";
         }
 
-        function updHP(who, hp, max){
-          document.getElementById(who+"p").style.width = Math.max(0,Math.min(100,hp/max*100))+"%";
-          document.getElementById(who+"t").textContent = `${Math.max(0,Math.ceil(hp))} HP`;
+        function updHP(who, hp, max) {
+            document.getElementById(who + "p").style.width = Math.max(0, Math.min(100, hp / max * 100)) + "%";
+            document.getElementById(who + "t").textContent = `${Math.max(0, Math.ceil(hp))} HP`;
         }
 
-        function updSt(who, map){
-          const row = document.getElementById(who+"sr");
-          row.innerHTML="";
-          for(const [s,d] of Object.entries(map)){
-            if(d.r<=0) continue;
-            const c=document.createElement("span");
-            c.className=`sc ${SCLS[s]||"sf"}`;
-            c.textContent=`${ICO[s]||"✦"} ${s}`;
-            if(d.stk>1) c.textContent+=` ×${d.stk}`;
-            row.appendChild(c);
-            requestAnimationFrame(()=>c.classList.add("on"));
-          }
+        function updSt(who, map) {
+            const row = document.getElementById(who + "sr");
+            row.innerHTML = "";
+            for (const [s, d] of Object.entries(map)) {
+                if (d.r <= 0) continue;
+                const c = document.createElement("span");
+                c.className = `sc ${SCLS[s] || "sf"}`;
+                c.textContent = `${ICO[s] || "✦"} ${s}`;
+                if (d.stk > 1) c.textContent += ` ×${d.stk}`;
+                row.appendChild(c);
+                requestAnimationFrame(() => c.classList.add("on"));
+            }
         }
 
-        function apSt(who, s, rounds){
-          const m = who==="p" ? pSt : eSt;
-          const ms = s==="Burn"?3:1;
-          if(m[s]){ m[s].r=rounds; if(m[s].stk<ms) m[s].stk++; }
-          else     { m[s]={r:rounds,stk:1,ms}; }
-          updSt(who, who==="p"?pSt:eSt);
+        function apSt(who, s, rounds) {
+            const m = who === "p" ? pSt : eSt;
+            const ms = s === "Burn" ? 3 : 1;
+            if (m[s]) { m[s].r = rounds; if (m[s].stk < ms) m[s].stk++; }
+            else      { m[s] = { r: rounds, stk: 1, ms }; }
+            updSt(who, who === "p" ? pSt : eSt);
         }
 
-        function tickSt(who){
-          const m=who==="p"?pSt:eSt;
-          for(const k of Object.keys(m)){ m[k].r--; if(m[k].r<=0) delete m[k]; }
-          updSt(who,m);
+        function tickSt(who) {
+            const m = who === "p" ? pSt : eSt;
+            for (const k of Object.keys(m)) { m[k].r--; if (m[k].r <= 0) delete m[k]; }
+            updSt(who, m);
         }
 
-        const feed=document.getElementById("feed");
-        function addEv(html,cls){
-          const d=document.createElement("div");
-          d.className=`ec ${cls}`;
-          d.innerHTML=html;
-          feed.appendChild(d);
-          feed.scrollTop=feed.scrollHeight;
+        const feed = document.getElementById("feed");
+        function addEv(html, cls) {
+            const d = document.createElement("div");
+            d.className = `ec ${cls}`;
+            d.innerHTML = html;
+            feed.appendChild(d);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function dotLabel(statuses) {
+            if (!statuses) return { ico:"💢", label:"DOT", col:"rgba(200,200,220,.5)" };
+            if (statuses.includes("Bleed"))  return { ico:"🩸", label:"Bleed",  col:"var(--bl)" };
+            if (statuses.includes("Poison")) return { ico:"☠️", label:"Poison", col:"var(--po)" };
+            if (statuses.includes("Burn"))   return { ico:"🔥", label:"Burn",   col:"var(--bu)" };
+            return { ico:"💢", label:"DOT", col:"rgba(200,200,220,.5)" };
         }
 
         // ── REPLAY
-        async function replay(){
-          pSt={}; eSt={};
-          feed.innerHTML="";
-          updSt("p",{}); updSt("e",{});
-          updHP("ph",PMAX,PMAX); updHP("eh",EMAX,EMAX);
+        async function replay() {
+            pSt = {}; eSt = {};
+            pWardCur = PWMAX; eWardCur = EWMAX;
+            feed.innerHTML = "";
+            updSt("p", {}); updSt("e", {});
+            updHP("ph", PMAX, PMAX); updHP("eh", EMAX, EMAX);
+            initWardBars();
 
-          const TICK=620;
-          let sdShown=false;
+            const TICK = 620;
+            let sdShown = false;
 
-          for(let i=0;i<ROUNDS.length;i++){
-            const r=ROUNDS[i];
+            for (let i = 0; i < ROUNDS.length; i++) {
+                const r = ROUNDS[i];
 
-            if(r.roundNumber>15 && !sdShown){
-              sdShown=true;
-              const ov=document.getElementById("sdov");
-              ov.style.display="flex";
-              ov.innerHTML='<div class="sdf">⚡ SUDDEN DEATH ⚡</div>';
-              await slp(1400); ov.style.display="none";
-            }
-
-            const lbl=document.getElementById("rlbl");
-            lbl.className=r.roundNumber>15?"rl sd":"rl";
-            lbl.textContent=""; void lbl.offsetWidth;
-            lbl.textContent=r.roundNumber>15?`⚡ Sudden Death — Round ${r.roundNumber}`:`Round ${r.roundNumber}`;
-
-            // ── DOT tick görsel ─────────────────────────────────────────
-            // EventLog formatı: "pDot|eDot" (örn. "23.5|0.0")
-            let pDot = 0, eDot = 0;
-            if (r.eventLog && r.eventLog.includes("|")) {
-              const parts = r.eventLog.split("|");
-              pDot = parseFloat(parts[0]) || 0;
-              eDot = parseFloat(parts[1]) || 0;
-            }
-
-            // Aktif debuffları belirle (DOT label için)
-            function dotLabel(map) {
-              if (map["Bleed"])  return { ico:"🩸", label:"Bleed",  col:"var(--bl)" };
-              if (map["Poison"]) return { ico:"☠️", label:"Poison", col:"var(--po)" };
-              if (map["Burn"])   return { ico:"🔥", label:"Burn",   col:"var(--bu)" };
-              return { ico:"💢", label:"DOT", col:"rgba(200,200,220,.5)" };
-            }
-
-            tickSt("p"); tickSt("e");
-
-
-            // Oyuncu DOT hasar aldıysa göster
-            if (pDot > 0.5) {
-              const lp = dotLabel(pSt);
-              addEv(`<span class="ptx" style="color:${lp.col}">${lp.ico} ${lp.label} tick — you take <strong>${Math.ceil(pDot)}</strong> damage</span>`,"proc");
-              await slp(220);
-            }
-
-            // Rakip DOT hasar aldıysa göster
-            if (eDot > 0.5) {
-              const le = dotLabel(eSt);
-              addEv(`<span class="ptx" style="color:${le.col}">${le.ico} ${le.label} tick — enemy takes <strong>${Math.ceil(eDot)}</strong> damage</span>`,"proc");
-              await slp(220);
-            }
-
-            await slp(pDot > 0.5 || eDot > 0.5 ? 80 : 160);
-
-            // Ward absorbed göster
-            if (r.playerWardAbsorbed > 0.5) {
-                addEv(`<span class="ptx" style="color:#88aaff">🔮 Ward absorbs <strong>${Math.ceil(r.playerWardAbsorbed)}</strong> damage</span>`, "proc");
-                await slp(120);
-            }
-            if (r.opponentWardAbsorbed > 0.5) {
-                addEv(`<span class="ptx" style="color:#88aaff">🔮 Enemy Ward absorbs <strong>${Math.ceil(r.opponentWardAbsorbed)}</strong> damage</span>`, "proc");
-                await slp(120);
-            }
-
-            // Player action
-            if(r.playerHit){
-              let b="";
-              if(r.playerCrit)    b+=`<span class="b bcr">Crit!</span>`;
-              if(r.playerBlocked) b+=`<span class="b bbk">Blocked</span>`;
-              if(r.playerAction!=="BasicAttack") b+=`<span class="b bsk">${aname(r.playerAction)}</span>`;
-              addEv(`<div class="ei">${aicon(r.playerAction)}</div>
-        <div style="flex:1"><div class="ea">${aname(r.playerAction)}</div><div class="bdg">${b}</div></div>
-        <div class="edm${r.playerCrit?" cr":""}">${Math.ceil(r.playerDamage)}</div>`,"pe");
-
-              const procs=PROCS[r.playerAction];
-              if(procs){
-                for(const proc of procs){
-                  await slp(190);
-                  if(proc.b){
-                    apSt("p",proc.s,proc.d||2);
-                    addEv(`<span class="ptx" style="color:var(--bf)">✨ ${ICO[proc.s]||""} ${proc.s} activated!</span>`,"proc");
-                  } else {
-                    apSt("e",proc.s,proc.d||2);
-                    const col=PCOL[proc.s]||"var(--gold)";
-                    addEv(`<span class="ptx" style="color:${col}">${ICO[proc.s]||"✦"} ${proc.s} applied!</span>`,"proc");
-                  }
+                // Sudden Death overlay
+                if (r.roundNumber > 15 && !sdShown) {
+                    sdShown = true;
+                    const ov = document.getElementById("sdov");
+                    ov.style.display = "flex";
+                    ov.innerHTML = '<div class="sdf">⚡ SUDDEN DEATH ⚡</div>';
+                    await slp(1400); ov.style.display = "none";
                 }
-              }
-            } else {
-              addEv(`<div class="ei">${aicon(r.playerAction)}</div>
-        <div style="flex:1"><div class="ea">${aname(r.playerAction)}</div></div>
-        <div class="edm ms">MISS</div>`,"pe");
+
+                // Round label
+                const lbl = document.getElementById("rlbl");
+                lbl.className = r.roundNumber > 15 ? "rl sd" : "rl";
+                lbl.textContent = ""; void lbl.offsetWidth;
+                lbl.textContent = r.roundNumber > 15
+                    ? `⚡ Sudden Death — Round ${r.roundNumber}`
+                    : `Round ${r.roundNumber}`;
+
+                // ── 1. DOT TICK (round başı)
+                tickSt("p"); tickSt("e");
+
+                const pDot = r.playerDotDamage || 0;
+                const eDot = r.opponentDotDamage || 0;
+
+                if (pDot > 0.5) {
+                    const lp = dotLabel(r.activePlayerStatuses);
+                    addEv(`<span class="ptx" style="color:${lp.col}">${lp.ico} ${lp.label} — you take <strong>${Math.ceil(pDot)}</strong></span>`, "proc");
+                    await slp(220);
+                }
+                if (eDot > 0.5) {
+                    const le = dotLabel(r.activeOpponentStatuses);
+                    addEv(`<span class="ptx" style="color:${le.col}">${le.ico} ${le.label} — enemy takes <strong>${Math.ceil(eDot)}</strong></span>`, "proc");
+                    await slp(220);
+                }
+                await slp(pDot > 0.5 || eDot > 0.5 ? 80 : 160);
+
+                // ── 2. PLAYER ACTION
+                if (r.playerHit) {
+                    let b = "";
+                    if (r.playerCrit)    b += `<span class="b bcr">Crit!</span>`;
+                    if (r.playerBlocked) b += `<span class="b bbk">Blocked</span>`;
+                    if (r.playerAction !== "BasicAttack") b += `<span class="b bsk">${aname(r.playerAction)}</span>`;
+
+                    // MultiHit display
+                    let dmgDisplay = "";
+                    if (r.playerMultiHitLog && r.playerMultiHitLog.includes("|")) {
+                        const hits = r.playerMultiHitLog.split("|");
+                        dmgDisplay = hits.map((h, i) => {
+                            const isCrit = h.includes("*");
+                            const val = h.replace("*", "");
+                            return `<span style="font-size:.75em;opacity:.8">Hit ${i + 1}:</span> <span style="${isCrit ? "color:#ffd700" : ""}"><strong>${val}</strong></span>`;
+                        }).join(" &nbsp;+&nbsp; ");
+                        b += `<span class="b" style="background:rgba(255,200,50,.15);color:#ffd060;border-color:rgba(255,200,50,.3)">×${hits.length}</span>`;
+                    } else {
+                        dmgDisplay = `<strong>${Math.ceil(r.playerDamage)}</strong>`;
+                    }
+
+                    addEv(`<div class="ei">${aicon(r.playerAction)}</div>
+                        <div style="flex:1"><div class="ea">${aname(r.playerAction)}</div><div class="bdg">${b}</div></div>
+                        <div class="edm${r.playerCrit ? " cr" : ""}">${dmgDisplay}</div>`, "pe");
+
+                    // Ward bar güncelle (damage sonrası)
+                    if ((r.opponentWardAbsorbed || 0) > 0.5)
+                        updateWard('e', r.opponentWardAbsorbed);
+
+                    // Elemental
+                    if ((r.playerElementalDamage || 0) > 0.5)
+                        addEv(`<span class="ptx" style="color:#aaddff;font-size:.72em">⚡ +${Math.ceil(r.playerElementalDamage)} elemental</span>`, "proc");
+
+                    // Lifesteal
+                    if ((r.playerLifesteal || 0) > 0.5) {
+                        addEv(`<span class="ptx" style="color:#60e060;font-size:.72em">💚 +${Math.ceil(r.playerLifesteal)} HP</span>`, "proc");
+                    }
+
+                    // Skill proc'ları
+                    const procs = PROCS[r.playerAction];
+                    if (procs) {
+                        for (const proc of procs) {
+                            await slp(190);
+                            if (proc.b) {
+                                apSt("p", proc.s, proc.d || 2);
+                                addEv(`<span class="ptx" style="color:var(--bf)">✨ ${ICO[proc.s] || ""} ${proc.s} activated!</span>`, "proc");
+                            } else {
+                                apSt("e", proc.s, proc.d || 2);
+                                const col = PCOL[proc.s] || "var(--gold)";
+                                addEv(`<span class="ptx" style="color:${col}">${ICO[proc.s] || "✦"} ${proc.s} applied!</span>`, "proc");
+                            }
+                        }
+                    }
+                } else {
+                    addEv(`<div class="ei">${aicon(r.playerAction)}</div>
+                        <div style="flex:1"><div class="ea">${aname(r.playerAction)}</div></div>
+                        <div class="edm ms">MISS</div>`, "pe");
+                }
+
+                // Opponent HP bar güncelle
+                updHP("eh", r.opponentHpRemaining, EMAX);
+                await slp(TICK);
+                if (r.opponentHpRemaining <= 0) break;
+
+                // ── 3. OPPONENT ACTION
+                if (r.opponentHit) {
+                    let ob = "";
+                    if (r.opponentCrit)    ob += `<span class="b bcr">Crit!</span>`;
+                    if (r.opponentBlocked) ob += `<span class="b bbk">Blocked</span>`;
+                    addEv(`<div class="ei">${aicon(r.opponentAction)}</div>
+                        <div style="flex:1"><div class="ea">${aname(r.opponentAction)}</div><div class="bdg">${ob}</div></div>
+                        <div class="edm${r.opponentCrit ? " cr" : ""}">${Math.ceil(r.opponentDamage)}</div>`, "ee");
+
+                    // Ward bar güncelle
+                    if ((r.playerWardAbsorbed || 0) > 0.5)
+                        updateWard('p', r.playerWardAbsorbed);
+
+                    // Opponent elemental
+                    if ((r.opponentElementalDamage || 0) > 0.5)
+                        addEv(`<span class="ptx" style="color:#ffaaaa;font-size:.72em">⚡ +${Math.ceil(r.opponentElementalDamage)} elemental</span>`, "proc");
+                } else {
+                    addEv(`<div class="ei">${aicon(r.opponentAction)}</div>
+                        <div style="flex:1"><div class="ea">${aname(r.opponentAction)}</div></div>
+                        <div class="edm ms">MISS</div>`, "ee");
+                }
+
+                // Player HP bar güncelle
+                updHP("ph", r.playerHpRemaining, PMAX);
+                await slp(TICK);
+                if (r.playerHpRemaining <= 0) break;
             }
 
-            updHP("eh",r.opponentHpRemaining,EMAX);
-            await slp(TICK);
-            if(r.opponentHpRemaining<=0) break;
-
-            // Opponent action
-            if(r.opponentHit){
-              let ob="";
-              if(r.opponentCrit)    ob+=`<span class="b bcr">Crit!</span>`;
-              if(r.opponentBlocked) ob+=`<span class="b bbk">Blocked</span>`;
-              addEv(`<div class="ei">${aicon(r.opponentAction)}</div>
-        <div style="flex:1"><div class="ea">${aname(r.opponentAction)}</div><div class="bdg">${ob}</div></div>
-        <div class="edm${r.opponentCrit?" cr":""}">${Math.ceil(r.opponentDamage)}</div>`,"ee");
-            } else {
-              addEv(`<div class="ei">${aicon(r.opponentAction)}</div>
-        <div style="flex:1"><div class="ea">${aname(r.opponentAction)}</div></div>
-        <div class="edm ms">MISS</div>`,"ee");
+            // Son HP değerlerini garantile
+            if (ROUNDS.length) {
+                const last = ROUNDS[ROUNDS.length - 1];
+                updHP("ph", Math.max(0, last.playerHpRemaining), PMAX);
+                updHP("eh", Math.max(0, last.opponentHpRemaining), EMAX);
             }
 
-            updHP("ph",r.playerHpRemaining,PMAX);
-            await slp(TICK);
-            if(r.playerHpRemaining<=0) break;
-          }
-
-          if(ROUNDS.length){
-            const last=ROUNDS[ROUNDS.length-1];
-            updHP("ph",Math.max(0,last.playerHpRemaining),PMAX);
-            updHP("eh",Math.max(0,last.opponentHpRemaining),EMAX);
-          }
-
-          await slp(500);
-          const rp=document.getElementById("rp");
-          rp.style.display="block";
-          rp.scrollIntoView({behavior:"smooth",block:"start"});
+            await slp(500);
+            const rp = document.getElementById("rp");
+            rp.style.display = "block";
+            rp.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
         // ── COUNTDOWN
-        async function countdown(){
-          const ov=document.getElementById("cdown");
-          const num=document.getElementById("cnum");
-          const sub=document.getElementById("csub");
-          for(const [txt,cls,ms] of [["3","n3",920],["2","n2",920],["1","n1",920],["FIGHT","fi",720]]){
-            num.className=cls; num.textContent=txt;
-            if(cls==="fi") sub.textContent="";
-            await slp(ms);
-          }
-          ov.style.transition="opacity .4s"; ov.style.opacity="0";
-          await slp(400); ov.style.display="none";
-          const ar=document.getElementById("arena");
-          ar.style.cssText="display:block;opacity:0;transition:opacity .3s;";
-          await slp(40); ar.style.opacity="1";
-          await slp(300); await replay();
+        async function countdown() {
+            const ov = document.getElementById("cdown");
+            const num = document.getElementById("cnum");
+            const sub = document.getElementById("csub");
+            for (const [txt, cls, ms] of [["3","n3",920],["2","n2",920],["1","n1",920],["FIGHT","fi",720]]) {
+                num.className = cls; num.textContent = txt;
+                if (cls === "fi") sub.textContent = "";
+                await slp(ms);
+            }
+            ov.style.transition = "opacity .4s"; ov.style.opacity = "0";
+            await slp(400); ov.style.display = "none";
+            const ar = document.getElementById("arena");
+            ar.style.cssText = "display:block;opacity:0;transition:opacity .3s;";
+            await slp(40); ar.style.opacity = "1";
+            await slp(300); await replay();
         }
 
-        document.getElementById("rbtn")?.addEventListener("click",async()=>{
-          document.getElementById("rp").style.display="none";
-          await slp(150); await replay();
+        document.getElementById("rbtn")?.addEventListener("click", async () => {
+            document.getElementById("rp").style.display = "none";
+            await slp(150); await replay();
         });
 
-        window.addEventListener("load",countdown);
+        window.addEventListener("load", countdown);
     </script>
 </body>
 </html>
