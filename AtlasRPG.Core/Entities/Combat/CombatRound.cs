@@ -32,7 +32,14 @@ namespace AtlasRPG.Core.Entities.Combat
         public decimal OpponentHpRemaining { get; set; }
         public decimal PlayerWardAbsorbed { get; set; } = 0m;
         public decimal OpponentWardAbsorbed { get; set; } = 0m;
-
+        public decimal PlayerDotDamage { get; set; } = 0m;   // round başında tick'lenen DOT
+        public decimal OpponentDotDamage { get; set; } = 0m;
+        public string ActivePlayerStatuses { get; set; } = string.Empty;   // "Bleed,Poison"
+        public string ActiveOpponentStatuses { get; set; } = string.Empty;
+        public decimal PlayerLifesteal { get; set; } = 0m;
+        public decimal OpponentLifesteal { get; set; } = 0m;
+        public decimal PlayerElementalDamage { get; set; } = 0m;
+        public decimal OpponentElementalDamage { get; set; } = 0m;
         public string EventLog { get; set; } = string.Empty; // JSON or text summary
     }
 }
